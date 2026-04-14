@@ -89,12 +89,15 @@ body {
 .bento-img-4 { animation: bento-float-4 4.8s ease-in-out infinite 0.9s; }
 
 .bento-box {
-  transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275), box-shadow 0.4s ease;
+  transition:
+    transform 0.6s cubic-bezier(0.34, 1.56, 0.64, 1),
+    box-shadow 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
   will-change: transform, box-shadow;
 }
 .bento-box:hover {
-  transform: scale(1.08) translateY(-6px) !important;
-  box-shadow: 0 20px 40px rgba(0,0,0,0.2) !important;
+  transform: scale(1.11) translateY(-10px) rotate(-1.5deg) !important;
+  box-shadow: 0 28px 52px rgba(0,0,0,0.22) !important;
+  animation-play-state: paused !important;
   z-index: 20 !important;
 }
 
