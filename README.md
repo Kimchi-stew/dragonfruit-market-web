@@ -1,73 +1,56 @@
-# React + TypeScript + Vite
+# 🐉 드래곤프루트 마켓 (Dragonfruit Market)
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+드래곤프루트 마켓은 세련되고 현대적인 UI/UX를 자랑하는 프리미엄 이커머스 웹 애플리케이션입니다. 
+시각적인 아름다움과 직관적인 사용자 경험을 최우선으로 설계되었으며, 빠르고 쾌적한 쇼핑 경험을 제공합니다.
 
-Currently, two official plugins are available:
+## ✨ 주요 기능 (Features)
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- **프리미엄 UI 시스템:** 부드러운 인터랙션, 호버 효과, 반응형 레이아웃 탑재
+- **상품 탐색 및 상세 보기:** 상품 정보를 직관적으로 표시하며, 카테고리 필터링 및 평점(Star Rating) 컴포넌트 지원
+- **사용자 관리:** 로그인, 회원가입, 내 정보 관리를 위한 마이페이지 제공
+- **주문/결제 플로우:** 장바구니 페이지부터 결제 처리(Checkout) 페이지까지 유연하게 이어지는 쇼핑 플로우
+- **모던 프론트엔드 환경:** 최신 React, TypeScript, Vite 기반의 빠르고 안정적인 구동
+- **재사용 가능한 디자인 시스템:** 일관성을 위한 디자인 토큰(CSS 변수) 및 공통 UI 라이브러리(버튼, 입력 필드 등) 구축
 
-## React Compiler
+## 🛠 기술 스택 (Tech Stack)
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+- **Core**: React 19, TypeScript
+- **Bundler**: Vite
+- **Routing**: React Router v7
+- **Styling**: Vanilla CSS (자체 디자인 시스템 및 글로벌 토큰 활용)
+- **Icons**: Lucide React
 
-## Expanding the ESLint configuration
+## 📂 프로젝트 구조 (Project Structure)
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```text
+src/
+├── components/
+│   ├── layout/       # 네비게이션 바(GNB), 푸터(Footer) 등 레이아웃 구성요소
+│   ├── product/      # 상품 상세, 상품 카드 등 도메인 종속 컴포넌트
+│   └── ui/           # 버튼, 인풋, 카테고리 칩, 평점 등 재사용 가능 UI 컴포넌트
+├── data/             # 로컬 테스트 및 API 연동 전 목업(Mock) 데이터
+├── pages/            # 애플리케이션 각 화면 단위 (홈, 로그인, 장바구니, 결제 등)
+├── App.tsx           # 프로젝트 구조 및 내부 라우팅 설정
+└── index.css         # 글로벌 CSS 리셋 및 공통 디자인 시스템 토큰 변수 모음
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+## 🚀 시작하기 (Getting Started)
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+아래 명령어를 통해 로컬 환경에서 프로젝트를 실행할 수 있습니다.
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+### 1. 패키지 설치
+```bash
+npm install
 ```
+
+### 2. 개발 서버 실행
+```bash
+npm run dev
+```
+개발 서버가 띄워지면 웹 브라우저에서 `http://localhost:5173` 주소로 접속해 앱을 확인하실 수 있습니다.
+
+### 3. 프로덕션 파일 빌드
+```bash
+npm run build
+```
+배포용으로 최적화된 파일들은 `dist` 디렉토리에 생성됩니다.
