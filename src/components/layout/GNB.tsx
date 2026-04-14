@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { Search, Bell, ShoppingCart, User, Menu, X } from 'lucide-react'
 
@@ -14,8 +14,20 @@ export default function GNB() {
   const [searchFocused, setSearchFocused] = useState(false)
   const [searchValue, setSearchValue] = useState('')
   const [mobileOpen, setMobileOpen] = useState(false)
+  const [bellOpen, setBellOpen] = useState(false)
+  const bellRef = useRef<HTMLDivElement>(null)
   const navigate = useNavigate()
   const location = useLocation()
+
+  useEffect(() => {
+    const handleClick = (e: MouseEvent) => {
+      if (bellRef.current && !bellRef.current.contains(e.target as Node)) {
+        setBellOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [])
   
   const searchParams = new URLSearchParams(location.search)
   const currentCategory = searchParams.get('category')
@@ -39,8 +51,8 @@ export default function GNB() {
         {/* Logo */}
         <Link
           to="/"
-          className="shrink-0 text-[18px] font-bold tracking-tight"
-          style={{ color: 'var(--color-primary)' }}
+          className="shrink-0 text-[20px] tracking-tight"
+          style={{ color: 'var(--color-primary)', fontFamily: 'YeogiOttaeJalnan' }}
         >
           용과마켓
         </Link>
@@ -98,17 +110,51 @@ export default function GNB() {
             </div>
           </form>
 
-          {/* Icon buttons */}
-          {[
-            { icon: Bell, to: null, badge: null },
-          ].map(({ icon: Icon }, i) => (
+          {/* 알림 벨 */}
+          <div ref={bellRef} className="relative hidden sm:block">
             <button
-              key={i}
-              className="w-9 h-9 rounded-full flex items-center justify-center transition-colors hover:bg-[#F5F5F5] hidden sm:flex"
+              onClick={() => setBellOpen((v) => !v)}
+              className="w-9 h-9 rounded-full flex items-center justify-center transition-colors hover:bg-[#F5F5F5]"
             >
-              <Icon size={19} style={{ color: 'var(--color-text-secondary)' }} />
+              <Bell size={19} style={{ color: bellOpen ? 'var(--color-primary)' : 'var(--color-text-secondary)' }} />
             </button>
-          ))}
+
+            {bellOpen && (
+              <div
+                className="absolute right-0 top-[calc(100%+8px)] w-72 rounded-2xl border overflow-hidden z-50"
+                style={{
+                  borderColor: 'var(--color-border)',
+                  background: '#fff',
+                  boxShadow: '0 8px 24px rgba(0,0,0,0.10)',
+                }}
+              >
+                {/* 드롭다운 헤더 */}
+                <div
+                  className="flex items-center justify-between px-4 py-3 border-b"
+                  style={{ borderColor: 'var(--color-border)' }}
+                >
+                  <span className="text-sm font-semibold" style={{ color: 'var(--color-text-primary)' }}>
+                    알림
+                  </span>
+                  <button
+                    className="text-xs"
+                    style={{ color: 'var(--color-text-secondary)' }}
+                    onClick={() => setBellOpen(false)}
+                  >
+                    모두 읽음
+                  </button>
+                </div>
+
+                {/* 알림 없음 */}
+                <div className="flex flex-col items-center justify-center py-10 gap-2">
+                  <Bell size={28} style={{ color: 'var(--color-text-disabled)' }} />
+                  <p className="text-sm" style={{ color: 'var(--color-text-disabled)' }}>
+                    알림이 없습니다
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
 
           <Link
             to="/cart"
