@@ -1,1 +1,119 @@
+@import url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.min.css");
 @import "tailwindcss";
+
+@theme {
+  /* Colors */
+  --color-primary: #FF3D87;
+  --color-primary-light: #FF80B5;
+
+  --color-cat-beauty: #F48FB1;
+  --color-cat-fashion: #B3C8F5;
+  --color-cat-food: #B5EAD7;
+  --color-cat-tool: #FFF3B0;
+  --color-cat-sports: #D6B8F5;
+  --color-cat-pet: #E0E0E0;
+
+  --color-star: #FFC107;
+  --color-success: #4CAF50;
+  --color-error: #F44336;
+  --color-kakao: #FEE500;
+  --color-naver: #03C75A;
+
+  --color-bg: #FFFFFF;
+  --color-surface: #F5F5F5;
+  --color-border: #E0E0E0;
+  --color-text-primary: #1A1A1A;
+  --color-text-secondary: #757575;
+  --color-text-disabled: #BDBDBD;
+
+  /* Border radius */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+
+  /* Shadows */
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.08);
+  --shadow-md: 0 4px 12px rgba(0,0,0,0.12);
+  --shadow-lg: 0 8px 24px rgba(0,0,0,0.16);
+
+  /* Font */
+  --font-sans: 'Pretendard Variable', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  font-family: var(--font-sans);
+  color: var(--color-text-primary);
+  background: var(--color-bg);
+  margin: 0;
+}
+
+/* ── Keyframe animations ── */
+
+@keyframes bento-float-0 {
+  0%, 100% { transform: translateY(0); }
+  50%       { transform: translateY(-8px); }
+}
+@keyframes bento-float-1 {
+  0%, 100% { transform: translateY(0); }
+  50%       { transform: translateY(-5px); }
+}
+@keyframes bento-float-2 {
+  0%, 100% { transform: translateY(0); }
+  50%       { transform: translateY(-12px); }
+}
+@keyframes bento-float-3 {
+  0%, 100% { transform: translateY(0); }
+  50%       { transform: translateY(-6px); }
+}
+@keyframes bento-float-4 {
+  0%, 100% { transform: translateY(0); }
+  50%       { transform: translateY(-10px); }
+}
+
+.bento-img-0 { animation: bento-float-0 4.2s ease-in-out infinite; }
+.bento-img-1 { animation: bento-float-1 3.8s ease-in-out infinite 0.6s; }
+.bento-img-2 { animation: bento-float-2 4.5s ease-in-out infinite 1.2s; }
+.bento-img-3 { animation: bento-float-3 3.5s ease-in-out infinite 0.3s; }
+.bento-img-4 { animation: bento-float-4 4.8s ease-in-out infinite 0.9s; }
+
+.bento-box {
+  transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275), box-shadow 0.4s ease;
+  will-change: transform, box-shadow;
+}
+.bento-box:hover {
+  transform: scale(1.08) translateY(-6px) !important;
+  box-shadow: 0 20px 40px rgba(0,0,0,0.2) !important;
+  z-index: 20 !important;
+}
+
+@keyframes fade-slide-up {
+  from { opacity: 0; transform: translateY(18px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-up {
+  animation: fade-slide-up 0.55s ease both;
+}
+
+@keyframes hero-progress {
+  from { width: 0%; }
+  to   { width: 100%; }
+}
+.hero-progress {
+  animation: hero-progress 5s linear forwards;
+}
+
+/* scroll reveal */
+.reveal {
+  opacity: 0;
+  transform: translateY(24px);
+  transition: opacity 0.55s ease, transform 0.55s ease;
+}
+.reveal.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
