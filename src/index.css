@@ -1,5 +1,12 @@
-@import url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.min.css");
+@import url('https://cdn.jsdelivr.net/gh/wanteddev/wanted-sans@v1.0.1/packages/wanted-sans/fonts/webfonts/variable/split/WantedSansVariable.min.css');
 @import "tailwindcss";
+
+@font-face {
+  font-family: 'YeogiOttaeJalnan';
+  src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_four@1.2/JalnanOTF00.woff') format('woff');
+  font-weight: normal;
+  font-display: swap;
+}
 
 @theme {
   /* Colors */
@@ -38,7 +45,7 @@
   --shadow-lg: 0 8px 24px rgba(0,0,0,0.16);
 
   /* Font */
-  --font-sans: 'Pretendard Variable', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-sans: 'Wanted Sans Variable', 'Wanted Sans', -apple-system, BlinkMacSystemFont, sans-serif;
 }
 
 * {
