@@ -2,12 +2,20 @@ import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import Input from '../components/ui/Input'
 import Button from '../components/ui/Button'
+import { useAuth, ApiError } from '../contexts/AuthContext'
 
 export default function RegisterPage() {
+  const [email, setEmail] = useState('')
+  const [nickname, setNickname] = useState('')
   const [gender, setGender] = useState<string | null>(null)
   const [password, setPassword] = useState('')
+  const [confirmPw, setConfirmPw] = useState('')
   const [allAgreed, setAllAgreed] = useState(false)
   const [terms, setTerms] = useState({ service: false, privacy: false, marketing: false })
+  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
+
+  const { signup } = useAuth()
   const navigate = useNavigate()
 
   const passwordStrength =
@@ -25,9 +33,43 @@ export default function RegisterPage() {
     setTerms({ service: next, privacy: next, marketing: next })
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
-    navigate('/login')
+    setError('')
+
+    if (password !== confirmPw) {
+      setError('비밀번호가 일치하지 않습니다')
+      return
+    }
+    if (!terms.service || !terms.privacy) {
+      setError('필수 약관에 동의해주세요')
+      return
+    }
+
+    const genderMap: Record<string, 'M' | 'F' | null> = {
+      '남성': 'M',
+      '여성': 'F',
+      '선택 안함': null,
+    }
+
+    setLoading(true)
+    try {
+      await signup({
+        email,
+        password,
+        nickname,
+        gender: gender ? (genderMap[gender] ?? null) : null,
+      })
+      navigate('/login')
+    } catch (err) {
+      if (err instanceof ApiError) {
+        setError(err.message)
+      } else {
+        setError('회원가입 중 오류가 발생했습니다')
+      }
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -43,9 +85,32 @@ export default function RegisterPage() {
           </p>
         </div>
 
+        {/* 에러 메시지 */}
+        {error && (
+          <div
+            className="px-4 py-3 rounded-xl text-sm text-center"
+            style={{ background: 'rgba(244,67,54,0.08)', color: 'var(--color-error)' }}
+          >
+            {error}
+          </div>
+        )}
+
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-          <Input label="이메일" type="email" placeholder="example@email.com" required />
-          <Input label="닉네임" placeholder="닉네임 입력" required />
+          <Input
+            label="이메일"
+            type="email"
+            placeholder="example@email.com"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+          />
+          <Input
+            label="닉네임"
+            placeholder="닉네임 입력"
+            value={nickname}
+            onChange={(e) => setNickname(e.target.value)}
+            required
+          />
 
           {/* Password with strength */}
           <div className="flex flex-col gap-1.5">
@@ -62,10 +127,7 @@ export default function RegisterPage() {
                 <div className="flex-1 h-1.5 rounded-full" style={{ background: 'var(--color-border)' }}>
                   <div
                     className="h-full rounded-full transition-all"
-                    style={{
-                      width: `${(passwordStrength / 3) * 100}%`,
-                      background: strengthColor,
-                    }}
+                    style={{ width: `${(passwordStrength / 3) * 100}%`, background: strengthColor }}
                   />
                 </div>
                 <span className="text-xs font-medium" style={{ color: strengthColor }}>
@@ -75,7 +137,15 @@ export default function RegisterPage() {
             )}
           </div>
 
-          <Input label="비밀번호 확인" type="password" placeholder="비밀번호 재입력" required />
+          <Input
+            label="비밀번호 확인"
+            type="password"
+            placeholder="비밀번호 재입력"
+            value={confirmPw}
+            onChange={(e) => setConfirmPw(e.target.value)}
+            error={confirmPw.length > 0 && confirmPw !== password ? '비밀번호가 일치하지 않아요' : undefined}
+            required
+          />
 
           {/* Gender */}
           <div>
@@ -115,8 +185,8 @@ export default function RegisterPage() {
             </label>
             <div className="h-px" style={{ background: 'var(--color-border)' }} />
             {[
-              { key: 'service', label: '이용약관 동의 (필수)' },
-              { key: 'privacy', label: '개인정보 수집 및 이용 동의 (필수)' },
+              { key: 'service',   label: '이용약관 동의 (필수)' },
+              { key: 'privacy',   label: '개인정보 수집 및 이용 동의 (필수)' },
               { key: 'marketing', label: '마케팅 정보 수신 동의 (선택)' },
             ].map(({ key, label }) => (
               <label key={key} className="flex items-center gap-2 text-sm cursor-pointer" style={{ color: 'var(--color-text-secondary)' }}>
@@ -135,8 +205,8 @@ export default function RegisterPage() {
             ))}
           </div>
 
-          <Button type="submit" size="full">
-            회원가입
+          <Button type="submit" size="full" disabled={loading}>
+            {loading ? '가입 중...' : '회원가입'}
           </Button>
         </form>
 

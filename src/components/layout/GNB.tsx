@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { Search, Bell, ShoppingCart, User, Menu, X } from 'lucide-react'
+import { Search, Bell, ShoppingCart, User, Menu, X, LogOut } from 'lucide-react'
+import { useAuth } from '../../contexts/AuthContext'
 
 const NAV_ITEMS = [
   { label: '전체', to: '/products' },
@@ -18,6 +19,10 @@ export default function GNB() {
   const bellRef = useRef<HTMLDivElement>(null)
   const navigate = useNavigate()
   const location = useLocation()
+  const { user, logout } = useAuth()
+
+  const searchParams = new URLSearchParams(location.search)
+  const currentCategory = searchParams.get('category')
 
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
@@ -28,9 +33,6 @@ export default function GNB() {
     document.addEventListener('mousedown', handleClick)
     return () => document.removeEventListener('mousedown', handleClick)
   }, [])
-  
-  const searchParams = new URLSearchParams(location.search)
-  const currentCategory = searchParams.get('category')
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault()
@@ -39,13 +41,16 @@ export default function GNB() {
     }
   }
 
+  const handleLogout = async () => {
+    await logout()
+    navigate('/')
+    setMobileOpen(false)
+  }
+
   return (
     <header
       className="sticky top-0 z-50 bg-white"
-      style={{
-        borderBottom: '1px solid var(--color-border)',
-        height: 56,
-      }}
+      style={{ borderBottom: '1px solid var(--color-border)', height: 56 }}
     >
       <div className="max-w-[1200px] mx-auto px-6 h-full flex items-center gap-6">
         {/* Logo */}
@@ -62,7 +67,6 @@ export default function GNB() {
           {NAV_ITEMS.map((item) => {
             const itemCategory = item.to.includes('category=') ? item.to.split('category=')[1] : null
             const isActive = location.pathname.startsWith('/products') && currentCategory === itemCategory
-
             return (
               <Link
                 key={item.label}
@@ -85,7 +89,7 @@ export default function GNB() {
           })}
         </nav>
 
-        {/* Right area — pushed to end */}
+        {/* Right area */}
         <div className="ml-auto flex items-center gap-1.5">
           {/* Search */}
           <form onSubmit={handleSearch} className="hidden sm:block">
@@ -128,34 +132,24 @@ export default function GNB() {
                   boxShadow: '0 8px 24px rgba(0,0,0,0.10)',
                 }}
               >
-                {/* 드롭다운 헤더 */}
                 <div
                   className="flex items-center justify-between px-4 py-3 border-b"
                   style={{ borderColor: 'var(--color-border)' }}
                 >
-                  <span className="text-sm font-semibold" style={{ color: 'var(--color-text-primary)' }}>
-                    알림
-                  </span>
-                  <button
-                    className="text-xs"
-                    style={{ color: 'var(--color-text-secondary)' }}
-                    onClick={() => setBellOpen(false)}
-                  >
+                  <span className="text-sm font-semibold" style={{ color: 'var(--color-text-primary)' }}>알림</span>
+                  <button className="text-xs" style={{ color: 'var(--color-text-secondary)' }} onClick={() => setBellOpen(false)}>
                     모두 읽음
                   </button>
                 </div>
-
-                {/* 알림 없음 */}
                 <div className="flex flex-col items-center justify-center py-10 gap-2">
                   <Bell size={28} style={{ color: 'var(--color-text-disabled)' }} />
-                  <p className="text-sm" style={{ color: 'var(--color-text-disabled)' }}>
-                    알림이 없습니다
-                  </p>
+                  <p className="text-sm" style={{ color: 'var(--color-text-disabled)' }}>알림이 없습니다</p>
                 </div>
               </div>
             )}
           </div>
 
+          {/* 장바구니 */}
           <Link
             to="/cart"
             className="w-9 h-9 rounded-full flex items-center justify-center relative transition-colors hover:bg-[#F5F5F5] hidden sm:flex"
@@ -169,20 +163,47 @@ export default function GNB() {
             </span>
           </Link>
 
-          <Link
-            to="/mypage"
-            className="w-9 h-9 rounded-full flex items-center justify-center transition-colors hover:bg-[#F5F5F5] hidden sm:flex"
-          >
-            <User size={19} style={{ color: 'var(--color-text-secondary)' }} />
-          </Link>
-
-          <Link
-            to="/login"
-            className="hidden sm:flex text-sm font-medium px-3.5 py-1.5 rounded-full transition-colors hover:bg-[#F5F5F5]"
-            style={{ color: 'var(--color-text-secondary)' }}
-          >
-            로그인
-          </Link>
+          {/* 로그인 상태에 따른 버튼 */}
+          {user ? (
+            <div className="hidden sm:flex items-center gap-1.5">
+              <Link
+                to="/mypage"
+                className="flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium transition-colors hover:bg-[#F5F5F5]"
+                style={{ color: 'var(--color-text-primary)' }}
+              >
+                <div
+                  className="w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0"
+                  style={{ background: 'var(--color-primary)' }}
+                >
+                  {user.nickname.charAt(0).toUpperCase()}
+                </div>
+                {user.nickname}
+              </Link>
+              <button
+                onClick={handleLogout}
+                className="w-9 h-9 rounded-full flex items-center justify-center transition-colors hover:bg-[#F5F5F5]"
+                title="로그아웃"
+              >
+                <LogOut size={17} style={{ color: 'var(--color-text-secondary)' }} />
+              </button>
+            </div>
+          ) : (
+            <>
+              <Link
+                to="/mypage"
+                className="w-9 h-9 rounded-full flex items-center justify-center transition-colors hover:bg-[#F5F5F5] hidden sm:flex"
+              >
+                <User size={19} style={{ color: 'var(--color-text-secondary)' }} />
+              </Link>
+              <Link
+                to="/login"
+                className="hidden sm:flex text-sm font-medium px-3.5 py-1.5 rounded-full transition-colors hover:bg-[#F5F5F5]"
+                style={{ color: 'var(--color-text-secondary)' }}
+              >
+                로그인
+              </Link>
+            </>
+          )}
 
           {/* Mobile hamburger */}
           <button
@@ -223,16 +244,12 @@ export default function GNB() {
             {NAV_ITEMS.map((item) => {
               const itemCategory = item.to.includes('category=') ? item.to.split('category=')[1] : null
               const isActive = location.pathname.startsWith('/products') && currentCategory === itemCategory
-
               return (
                 <Link
                   key={item.label}
                   to={item.to}
-                  className="text-sm font-medium transition-colors hover:text-[var(--color-primary)]"
-                  style={{
-                    color: isActive ? 'var(--color-primary)' : 'var(--color-text-primary)',
-                    fontWeight: isActive ? 700 : 500,
-                  }}
+                  className="text-sm font-medium transition-colors"
+                  style={{ color: isActive ? 'var(--color-primary)' : 'var(--color-text-primary)', fontWeight: isActive ? 700 : 500 }}
                   onClick={() => setMobileOpen(false)}
                 >
                   {item.label}
@@ -248,12 +265,25 @@ export default function GNB() {
             <Link to="/cart" className="flex items-center gap-1.5" onClick={() => setMobileOpen(false)}>
               <ShoppingCart size={15} /> 장바구니
             </Link>
-            <Link to="/mypage" className="flex items-center gap-1.5" onClick={() => setMobileOpen(false)}>
-              <User size={15} /> 마이페이지
-            </Link>
-            <Link to="/login" onClick={() => setMobileOpen(false)}>
-              로그인
-            </Link>
+            {user ? (
+              <>
+                <Link to="/mypage" className="flex items-center gap-1.5" onClick={() => setMobileOpen(false)}>
+                  <User size={15} /> {user.nickname}
+                </Link>
+                <button className="flex items-center gap-1.5" onClick={handleLogout}>
+                  <LogOut size={15} /> 로그아웃
+                </button>
+              </>
+            ) : (
+              <>
+                <Link to="/mypage" className="flex items-center gap-1.5" onClick={() => setMobileOpen(false)}>
+                  <User size={15} /> 마이페이지
+                </Link>
+                <Link to="/login" onClick={() => setMobileOpen(false)}>
+                  로그인
+                </Link>
+              </>
+            )}
           </div>
         </div>
       )}

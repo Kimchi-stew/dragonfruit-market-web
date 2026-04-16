@@ -2,16 +2,34 @@ import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import Input from '../components/ui/Input'
 import Button from '../components/ui/Button'
+import { useAuth, ApiError } from '../contexts/AuthContext'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [remember, setRemember] = useState(false)
+  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
+  const { login } = useAuth()
   const navigate = useNavigate()
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
-    navigate('/')
+    setError('')
+    setLoading(true)
+
+    try {
+      await login(email, password)
+      navigate('/')
+    } catch (err) {
+      if (err instanceof ApiError) {
+        setError(err.message)
+      } else {
+        setError('로그인 중 오류가 발생했습니다')
+      }
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -26,6 +44,16 @@ export default function LoginPage() {
             언제나 다채로운 하나의 쇼핑 플랫폼
           </p>
         </div>
+
+        {/* 에러 메시지 */}
+        {error && (
+          <div
+            className="px-4 py-3 rounded-xl text-sm text-center"
+            style={{ background: 'rgba(244,67,54,0.08)', color: 'var(--color-error)' }}
+          >
+            {error}
+          </div>
+        )}
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
@@ -61,8 +89,8 @@ export default function LoginPage() {
             </Link>
           </div>
 
-          <Button type="submit" size="full">
-            로그인
+          <Button type="submit" size="full" disabled={loading}>
+            {loading ? '로그인 중...' : '로그인'}
           </Button>
         </form>
 
