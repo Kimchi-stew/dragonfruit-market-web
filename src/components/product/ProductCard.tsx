@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { memo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Heart } from 'lucide-react'
 import StarRating from '../ui/StarRating'
@@ -29,7 +29,7 @@ const PLACEHOLDER_COLORS = [
   '#FFE9F3', '#F0F0F0', '#EDF6FF', '#FFF3F3',
 ]
 
-export default function ProductCard({ product, size = 'default' }: ProductCardProps) {
+const ProductCard = memo(function ProductCard({ product, size = 'default' }: ProductCardProps) {
   const [wished, setWished] = useState(false)
   const [animate, setAnimate] = useState(false)
   const [imgLoaded, setImgLoaded] = useState(false)
@@ -147,4 +147,6 @@ export default function ProductCard({ product, size = 'default' }: ProductCardPr
       </div>
     </Link>
   )
-}
+})
+
+export default ProductCard
