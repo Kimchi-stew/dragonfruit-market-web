@@ -1,11 +1,8 @@
 import { createContext, useContext, useEffect, useState, useCallback } from 'react'
-import { authApi, type SignupBody } from '../api/auth'
+import { authApi, userApi, type SignupBody, type UserProfile } from '../api/auth'
 import { ApiError } from '../api/client'
 
-interface User {
-  email: string
-  nickname: string
-}
+export type User = UserProfile
 
 interface AuthContextValue {
   user: User | null
@@ -13,6 +10,7 @@ interface AuthContextValue {
   login: (email: string, password: string) => Promise<void>
   logout: () => Promise<void>
   signup: (body: SignupBody) => Promise<void>
+  refreshUser: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null)
@@ -49,9 +47,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const tryAutoLogin = async () => {
       const refreshToken = localStorage.getItem('refreshToken')
-      const savedUser = loadUser()
 
-      if (!refreshToken || !savedUser) {
+      if (!refreshToken) {
         setLoading(false)
         return
       }
@@ -59,7 +56,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       try {
         const res = await authApi.autoLogin(refreshToken)
         saveTokens(res.data.accessToken, res.data.refreshToken)
-        setUser(savedUser)
+        // 토큰 갱신 후 실제 프로필 조회
+        const profileRes = await userApi.getProfile()
+        saveUser(profileRes.data)
+        setUser(profileRes.data)
       } catch {
         clearTokens()
       } finally {
@@ -73,15 +73,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const login = useCallback(async (email: string, password: string) => {
     const res = await authApi.login({ email, password })
     const { accessToken, refreshToken } = res.data
-
-    // 이메일에서 @ 앞부분을 임시 닉네임으로 사용 (로그인 응답에 닉네임 없음)
-    const savedUser = loadUser()
-    const nickname = savedUser?.email === email ? savedUser.nickname : email.split('@')[0]
-    const userInfo: User = { email, nickname }
-
     saveTokens(accessToken, refreshToken)
-    saveUser(userInfo)
-    setUser(userInfo)
+
+    // 로그인 후 실제 프로필 조회
+    const profileRes = await userApi.getProfile()
+    saveUser(profileRes.data)
+    setUser(profileRes.data)
   }, [])
 
   const logout = useCallback(async () => {
@@ -97,12 +94,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signup = useCallback(async (body: SignupBody) => {
     await authApi.signup(body)
-    // 회원가입 후 자동 로그인을 위해 유저 정보 임시 저장
-    saveUser({ email: body.email, nickname: body.nickname })
+  }, [])
+
+  const refreshUser = useCallback(async () => {
+    const profileRes = await userApi.getProfile()
+    saveUser(profileRes.data)
+    setUser(profileRes.data)
   }, [])
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout, signup }}>
+    <AuthContext.Provider value={{ user, loading, login, logout, signup, refreshUser }}>
       {children}
     </AuthContext.Provider>
   )

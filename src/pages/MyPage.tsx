@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Package, Heart, ThumbsUp, MessageSquare, HelpCircle,
@@ -9,6 +9,9 @@ import Input from '../components/ui/Input'
 import Button from '../components/ui/Button'
 import StarRating from '../components/ui/StarRating'
 import { MOCK_PRODUCTS } from '../data/mockProducts'
+import { userApi, type UpdateProfileBody, type UpdatePasswordBody } from '../api/auth'
+import { ApiError } from '../api/client'
+import { useAuth } from '../contexts/AuthContext'
 
 const SIDEBAR_MENU = [
   { icon: Package,       label: '주문 내역',    key: 'orders',   badge: null },
@@ -524,14 +527,22 @@ function CouponsSection() {
 
 // ── 계정 설정 ─────────────────────────────────────────────────
 function SettingsSection() {
-  const [nickname, setNickname] = useState('닉네임')
-  const [phone, setPhone] = useState('')
-  const [birthday, setBirthday] = useState('')
+  const { user, refreshUser } = useAuth()
+
+  const [nickname, setNickname] = useState('')
+  const [profileLoading, setProfileLoading] = useState(true)
+  const [profileSaving, setProfileSaving] = useState(false)
+  const [profileError, setProfileError] = useState('')
+  const [profileSaved, setProfileSaved] = useState(false)
+
   const [password, setPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
+  const [pwSaving, setPwSaving] = useState(false)
+  const [pwError, setPwError] = useState('')
+  const [pwSaved, setPwSaved] = useState(false)
+
   const [notification, setNotification] = useState({ email: true, sms: false, push: true })
-  const [saved, setSaved] = useState(false)
 
   const passwordStrength =
     newPassword.length === 0 ? 0
@@ -541,19 +552,80 @@ function SettingsSection() {
   const strengthLabel = ['', '약함', '보통', '강함'][passwordStrength]
   const strengthColor = ['', 'var(--color-error)', 'var(--color-star)', 'var(--color-success)'][passwordStrength]
 
-  const handleSave = (e: React.FormEvent<HTMLFormElement>) => {
+  // 프로필 불러오기
+  useEffect(() => {
+    const fetchProfile = async () => {
+      try {
+        const res = await userApi.getProfile()
+        setNickname(res.data.nickname)
+      } catch {
+        // 이미 AuthContext에 user가 있으면 그걸 사용
+        if (user) setNickname(user.nickname)
+      } finally {
+        setProfileLoading(false)
+      }
+    }
+    fetchProfile()
+  }, [user])
+
+  const handleProfileSave = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
-    setSaved(true)
-    setTimeout(() => setSaved(false), 2500)
+    setProfileError('')
+    setProfileSaving(true)
+    try {
+      const body: UpdateProfileBody = { nickname }
+      await userApi.updateProfile(body)
+      await refreshUser()
+      setProfileSaved(true)
+      setTimeout(() => setProfileSaved(false), 2500)
+    } catch (err) {
+      setProfileError(err instanceof ApiError ? err.message : '저장 중 오류가 발생했습니다')
+    } finally {
+      setProfileSaving(false)
+    }
+  }
+
+  const handlePasswordSave = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault()
+    setPwError('')
+    if (newPassword !== confirmPassword) {
+      setPwError('새 비밀번호가 일치하지 않습니다')
+      return
+    }
+    setPwSaving(true)
+    try {
+      const body: UpdatePasswordBody = { password, newPassword }
+      await userApi.updatePassword(body)
+      setPassword('')
+      setNewPassword('')
+      setConfirmPassword('')
+      setPwSaved(true)
+      setTimeout(() => setPwSaved(false), 2500)
+    } catch (err) {
+      setPwError(err instanceof ApiError ? err.message : '비밀번호 변경 중 오류가 발생했습니다')
+    } finally {
+      setPwSaving(false)
+    }
+  }
+
+  if (profileLoading) {
+    return (
+      <section>
+        <h2 className="text-lg font-semibold mb-6">계정 설정</h2>
+        <div className="flex items-center justify-center py-16">
+          <div className="w-6 h-6 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: 'var(--color-primary)', borderTopColor: 'transparent' }} />
+        </div>
+      </section>
+    )
   }
 
   return (
     <section>
       <h2 className="text-lg font-semibold mb-6">계정 설정</h2>
-      <form onSubmit={handleSave} className="flex flex-col gap-8">
+      <div className="flex flex-col gap-8">
 
-        {/* 프로필 */}
-        <div className="flex flex-col gap-4">
+        {/* 프로필 폼 */}
+        <form onSubmit={handleProfileSave} className="flex flex-col gap-4">
           <h3 className="text-sm font-semibold" style={{ color: 'var(--color-text-primary)' }}>
             프로필
           </h3>
@@ -565,7 +637,7 @@ function SettingsSection() {
                 className="w-16 h-16 rounded-full flex items-center justify-center text-xl font-bold text-white"
                 style={{ background: 'var(--color-primary)' }}
               >
-                U
+                {user?.nickname?.charAt(0).toUpperCase() ?? 'U'}
               </div>
               <button
                 type="button"
@@ -583,41 +655,39 @@ function SettingsSection() {
             </div>
           </div>
 
-          <div className="flex flex-col gap-4">
-            <Input
-              label="이메일"
-              type="email"
-              value="user@example.com"
-              readOnly
-              style={{ opacity: 0.6, cursor: 'not-allowed' }}
-            />
-            <Input
-              label="닉네임"
-              placeholder="닉네임 입력"
-              value={nickname}
-              onChange={(e) => setNickname(e.target.value)}
-            />
-            <Input
-              label="휴대폰 번호"
-              type="tel"
-              placeholder="010-0000-0000"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-            />
-            <Input
-              label="생년월일"
-              type="date"
-              value={birthday}
-              onChange={(e) => setBirthday(e.target.value)}
-            />
+          <Input
+            label="이메일"
+            type="email"
+            value={user?.email ?? ''}
+            readOnly
+            style={{ opacity: 0.6, cursor: 'not-allowed' }}
+          />
+          <Input
+            label="닉네임"
+            placeholder="닉네임 입력"
+            value={nickname}
+            onChange={(e) => setNickname(e.target.value)}
+          />
+
+          {profileError && (
+            <p className="text-sm" style={{ color: 'var(--color-error)' }}>{profileError}</p>
+          )}
+
+          <div className="flex items-center gap-3">
+            <Button type="submit" disabled={profileSaving}>
+              {profileSaving ? '저장 중...' : '프로필 저장'}
+            </Button>
+            {profileSaved && (
+              <p className="text-sm" style={{ color: 'var(--color-success)' }}>저장되었습니다!</p>
+            )}
           </div>
-        </div>
+        </form>
 
         {/* 구분선 */}
         <div className="h-px" style={{ background: 'var(--color-border)' }} />
 
-        {/* 비밀번호 변경 */}
-        <div className="flex flex-col gap-4">
+        {/* 비밀번호 변경 폼 */}
+        <form onSubmit={handlePasswordSave} className="flex flex-col gap-4">
           <h3 className="text-sm font-semibold" style={{ color: 'var(--color-text-primary)' }}>
             비밀번호 변경
           </h3>
@@ -662,7 +732,20 @@ function SettingsSection() {
                 : undefined
             }
           />
-        </div>
+
+          {pwError && (
+            <p className="text-sm" style={{ color: 'var(--color-error)' }}>{pwError}</p>
+          )}
+
+          <div className="flex items-center gap-3">
+            <Button type="submit" disabled={pwSaving}>
+              {pwSaving ? '변경 중...' : '비밀번호 변경'}
+            </Button>
+            {pwSaved && (
+              <p className="text-sm" style={{ color: 'var(--color-success)' }}>변경되었습니다!</p>
+            )}
+          </div>
+        </form>
 
         {/* 구분선 */}
         <div className="h-px" style={{ background: 'var(--color-border)' }} />
@@ -702,16 +785,6 @@ function SettingsSection() {
         {/* 구분선 */}
         <div className="h-px" style={{ background: 'var(--color-border)' }} />
 
-        {/* 저장 */}
-        <div className="flex items-center gap-3">
-          <Button type="submit">변경사항 저장</Button>
-          {saved && (
-            <p className="text-sm" style={{ color: 'var(--color-success)' }}>
-              저장되었습니다!
-            </p>
-          )}
-        </div>
-
         {/* 계정 탈퇴 */}
         <div className="pt-2">
           <button
@@ -722,7 +795,7 @@ function SettingsSection() {
             회원 탈퇴
           </button>
         </div>
-      </form>
+      </div>
     </section>
   )
 }

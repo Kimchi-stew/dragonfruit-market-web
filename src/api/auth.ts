@@ -19,6 +19,28 @@ export interface SignupBody {
   profileImage?: string
 }
 
+export interface UserProfile {
+  id: number
+  email: string
+  nickname: string
+  gender: 'M' | 'F' | null
+  profileImage: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export interface UpdateProfileBody {
+  email?: string
+  nickname?: string
+  gender?: 'M' | 'F' | null
+  profileImage?: string | null
+}
+
+export interface UpdatePasswordBody {
+  password: string
+  newPassword: string
+}
+
 export const authApi = {
   signup: (body: SignupBody) =>
     api.post<ApiResponse<Record<string, never>>>('/users/signup', body),
@@ -31,4 +53,15 @@ export const authApi = {
 
   autoLogin: (refreshToken: string) =>
     api.post<ApiResponse<AuthTokens>>('/auth/auto-login', { refreshToken }),
+}
+
+export const userApi = {
+  getProfile: () =>
+    api.get<ApiResponse<UserProfile>>('/users/profile'),
+
+  updateProfile: (body: UpdateProfileBody) =>
+    api.put<ApiResponse<UserProfile>>('/users/profile', body),
+
+  updatePassword: (body: UpdatePasswordBody) =>
+    api.put<ApiResponse<Record<string, never>>>('/users/profile/password', body),
 }
