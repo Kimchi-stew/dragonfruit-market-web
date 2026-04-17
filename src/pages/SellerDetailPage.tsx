@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Store, Users, Heart, ArrowLeft, Package } from 'lucide-react'
 import { sellersApi, type Seller } from '../api/sellers'
+import { ApiError } from '../api/client'
 
 export default function SellerDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -9,6 +10,8 @@ export default function SellerDetailPage() {
   const [seller, setSeller] = useState<Seller | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [followLoading, setFollowLoading] = useState(false)
+  const [likeLoading, setLikeLoading] = useState(false)
 
   useEffect(() => {
     if (!id) return
@@ -98,16 +101,53 @@ export default function SellerDetailPage() {
           </div>
         </div>
 
-        <button
-          className="shrink-0 px-4 py-2 rounded-full text-sm font-semibold transition-all duration-200 hover:opacity-80"
-          style={
-            seller.followed
-              ? { background: 'var(--color-border)', color: 'var(--color-text-secondary)' }
-              : { background: 'var(--color-primary)', color: '#fff' }
-          }
-        >
-          {seller.followed ? '팔로잉' : '팔로우'}
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={async () => {
+              if (likeLoading) return
+              setLikeLoading(true)
+              try {
+                const res = await sellersApi.like(seller.id)
+                setSeller((s) => s ? { ...s, likeCount: res.data.likeCount } : s)
+              } catch (err) {
+                if (err instanceof ApiError && err.status === 401) {
+                  alert('로그인이 필요합니다')
+                }
+              } finally { setLikeLoading(false) }
+            }}
+            className="flex items-center gap-1 px-3 py-1.5 rounded-full text-sm border transition-all hover:opacity-80"
+            style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)' }}
+          >
+            <Heart size={14} /> {seller.likeCount}
+          </button>
+          <button
+            onClick={async () => {
+              if (followLoading) return
+              setFollowLoading(true)
+              try {
+                const res = await sellersApi.follow(seller.id)
+                setSeller((s) => s ? {
+                  ...s,
+                  followed: res.data.followed,
+                  followCount: s.followCount + (res.data.followed ? 1 : -1),
+                } : s)
+              } catch (err) {
+                if (err instanceof ApiError && err.status === 401) {
+                  alert('로그인이 필요합니다')
+                }
+              } finally { setFollowLoading(false) }
+            }}
+            className="shrink-0 px-4 py-2 rounded-full text-sm font-semibold transition-all duration-200 hover:opacity-80 disabled:opacity-50"
+            disabled={followLoading}
+            style={
+              seller.followed
+                ? { background: 'var(--color-border)', color: 'var(--color-text-secondary)' }
+                : { background: 'var(--color-primary)', color: '#fff' }
+            }
+          >
+            {seller.followed ? '팔로잉' : '팔로우'}
+          </button>
+        </div>
       </div>
 
       {/* 상품 영역 (추후 연동) */}

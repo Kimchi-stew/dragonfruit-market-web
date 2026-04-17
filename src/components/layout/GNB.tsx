@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { Search, Bell, ShoppingCart, User, Menu, X, LogOut } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
+import { alarmApi, type AlarmItem } from '../../api/alarm'
 
 const NAV_ITEMS = [
   { label: '전체', to: '/products' },
@@ -17,6 +18,8 @@ export default function GNB() {
   const [searchValue, setSearchValue] = useState('')
   const [mobileOpen, setMobileOpen] = useState(false)
   const [bellOpen, setBellOpen] = useState(false)
+  const [alarms, setAlarms] = useState<AlarmItem[]>([])
+  const [unreadCount, setUnreadCount] = useState(0)
   const bellRef = useRef<HTMLDivElement>(null)
   const navigate = useNavigate()
   const location = useLocation()
@@ -34,6 +37,25 @@ export default function GNB() {
     document.addEventListener('mousedown', handleClick)
     return () => document.removeEventListener('mousedown', handleClick)
   }, [])
+
+  // 로그인 시 읽지 않은 알림 수 조회
+  useEffect(() => {
+    if (!user) { setUnreadCount(0); return }
+    alarmApi.getUnreadCount()
+      .then((count) => setUnreadCount(count))
+      .catch(() => setUnreadCount(0))
+  }, [user])
+
+  // 벨 열릴 때 알림 목록 조회
+  useEffect(() => {
+    if (!bellOpen || !user) return
+    alarmApi.getUnreadList(0, 10)
+      .then((page) => {
+        setAlarms(page.content ?? [])
+        setUnreadCount(0)
+      })
+      .catch(() => setAlarms([]))
+  }, [bellOpen, user])
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault()
@@ -121,14 +143,22 @@ export default function GNB() {
           <div ref={bellRef} className="relative hidden sm:block">
             <button
               onClick={() => setBellOpen((v) => !v)}
-              className="w-9 h-9 rounded-full flex items-center justify-center transition-colors hover:bg-[#F5F5F5]"
+              className="relative w-9 h-9 rounded-full flex items-center justify-center transition-colors hover:bg-[#F5F5F5]"
             >
               <Bell size={19} style={{ color: bellOpen ? 'var(--color-primary)' : 'var(--color-text-secondary)' }} />
+              {unreadCount > 0 && (
+                <span
+                  className="absolute top-0.5 right-0.5 min-w-[16px] h-4 rounded-full flex items-center justify-center text-white font-bold"
+                  style={{ fontSize: 9, background: 'var(--color-primary)', padding: '0 3px' }}
+                >
+                  {unreadCount > 99 ? '99+' : unreadCount}
+                </span>
+              )}
             </button>
 
             {bellOpen && (
               <div
-                className="absolute right-0 top-[calc(100%+8px)] w-72 rounded-2xl border overflow-hidden z-50"
+                className="absolute right-0 top-[calc(100%+8px)] w-80 rounded-2xl border overflow-hidden z-50"
                 style={{
                   borderColor: 'var(--color-border)',
                   background: '#fff',
@@ -141,13 +171,28 @@ export default function GNB() {
                 >
                   <span className="text-sm font-semibold" style={{ color: 'var(--color-text-primary)' }}>알림</span>
                   <button className="text-xs" style={{ color: 'var(--color-text-secondary)' }} onClick={() => setBellOpen(false)}>
-                    모두 읽음
+                    닫기
                   </button>
                 </div>
-                <div className="flex flex-col items-center justify-center py-10 gap-2">
-                  <Bell size={28} style={{ color: 'var(--color-text-disabled)' }} />
-                  <p className="text-sm" style={{ color: 'var(--color-text-disabled)' }}>알림이 없습니다</p>
-                </div>
+                {alarms.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-10 gap-2">
+                    <Bell size={28} style={{ color: 'var(--color-text-disabled)' }} />
+                    <p className="text-sm" style={{ color: 'var(--color-text-disabled)' }}>알림이 없습니다</p>
+                  </div>
+                ) : (
+                  <ul className="max-h-72 overflow-y-auto divide-y" style={{ borderColor: 'var(--color-border)' }}>
+                    {alarms.map((alarm) => (
+                      <li key={alarm.id} className="px-4 py-3">
+                        <p className="text-sm" style={{ color: alarm.read ? 'var(--color-text-secondary)' : 'var(--color-text-primary)', fontWeight: alarm.read ? 400 : 600 }}>
+                          {alarm.content}
+                        </p>
+                        <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-disabled)' }}>
+                          {new Date(alarm.createdAt).toLocaleDateString('ko-KR')}
+                        </p>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </div>
             )}
           </div>

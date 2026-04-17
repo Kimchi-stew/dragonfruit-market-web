@@ -53,4 +53,10 @@ export const sellersApi = {
 
   remove: (id: number) =>
     api.delete<ApiResponse<{ storeName: string; image: string; deletedAt: string }>>(`/sellers/${id}`),
+
+  like: (id: number) =>
+    api.post<ApiResponse<{ liked: boolean; likeCount: number }>>(`/sellers/likes/${id}`),
+
+  follow: (id: number) =>
+    api.post<ApiResponse<{ followed: boolean }>>(`/sellers/follow/${id}`),
 }

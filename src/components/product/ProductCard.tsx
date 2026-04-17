@@ -6,16 +6,17 @@ import StarRating from '../ui/StarRating'
 export interface Product {
   id: number
   name: string
-  brand: string
+  brand?: string
+  seller?: { id: number; storeName: string; image: string }
   price: number
   originalPrice?: number
   discountRate?: number
-  rating: number
-  reviewCount: number
+  rating?: number
+  reviewCount?: number
   image: string
-  category: string                          // beauty | fashion | food | tool | sports | pet
-  subcategory: string                       // 서브카테고리 칩과 일치
-  attrs: Record<string, string | string[]>  // 필터 속성
+  category?: string
+  subcategory?: string
+  attrs?: Record<string, string | string[]>
 }
 
 interface ProductCardProps {
@@ -96,12 +97,12 @@ const ProductCard = memo(function ProductCard({ product, size = 'default' }: Pro
 
       {/* Info */}
       <div className={`flex flex-col ${isSmall ? 'gap-0.5 p-2.5' : 'gap-1 p-3'}`}>
-        {/* Brand */}
+        {/* Brand / Seller */}
         <p
           className="text-[11px] font-medium truncate"
           style={{ color: 'var(--color-text-secondary)' }}
         >
-          {product.brand}
+          {product.brand ?? product.seller?.storeName ?? ''}
         </p>
 
         {/* Name */}
@@ -139,7 +140,7 @@ const ProductCard = memo(function ProductCard({ product, size = 'default' }: Pro
         </div>
 
         {/* Stars */}
-        {!isSmall && (
+        {!isSmall && product.rating !== undefined && (
           <div className="mt-0.5">
             <StarRating rating={product.rating} count={product.reviewCount} size="sm" />
           </div>

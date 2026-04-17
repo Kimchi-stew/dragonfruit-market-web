@@ -1,14 +1,13 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-  Package, Heart, ThumbsUp, MessageSquare, HelpCircle,
+  Package, Heart, MessageSquare, HelpCircle,
   Ticket, Settings, ChevronDown, ChevronUp, Camera, Store, Trash2,
 } from 'lucide-react'
 import ProductCard from '../components/product/ProductCard'
 import Input from '../components/ui/Input'
 import Button from '../components/ui/Button'
 import StarRating from '../components/ui/StarRating'
-import { MOCK_PRODUCTS } from '../data/mockProducts'
 import { userApi, type UpdateProfileBody, type UpdatePasswordBody } from '../api/auth'
 import { sellersApi, type Seller, type CreateSellerBody } from '../api/sellers'
 import { ApiError } from '../api/client'
@@ -219,14 +218,33 @@ function OrdersSection() {
 
 // ── 찜한 상품 ─────────────────────────────────────────────────
 function WishlistSection() {
+  const [products, setProducts] = useState<{ id: number; name: string; price: number; image: string; seller?: { id: number; storeName: string; image: string } }[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    userApi.getWishProducts()
+      .then((res) => setProducts(res.data))
+      .catch(() => setProducts([]))
+      .finally(() => setLoading(false))
+  }, [])
+
   return (
     <section>
       <h2 className="text-lg font-semibold mb-4">찜한 상품</h2>
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-        {MOCK_PRODUCTS.slice(0, 4).map((p) => (
-          <ProductCard key={p.id} product={p} size="small" />
-        ))}
-      </div>
+      {loading ? (
+        <div className="flex justify-center py-10">
+          <div className="w-6 h-6 rounded-full border-2 border-t-transparent animate-spin"
+            style={{ borderColor: 'var(--color-primary)', borderTopColor: 'transparent' }} />
+        </div>
+      ) : products.length === 0 ? (
+        <p className="text-sm py-10 text-center" style={{ color: 'var(--color-text-disabled)' }}>찜한 상품이 없습니다</p>
+      ) : (
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+          {products.map((p) => (
+            <ProductCard key={p.id} product={p} size="small" />
+          ))}
+        </div>
+      )}
     </section>
   )
 }
@@ -234,87 +252,84 @@ function WishlistSection() {
 
 // ── 내 리뷰 ───────────────────────────────────────────────────
 function ReviewsSection() {
-  const [helpfuls, setHelpfuls] = useState<Record<number, boolean>>({})
+  const [reviews, setReviews] = useState<import('../api/reviews').ReviewDetail[]>([])
+  const [loading, setLoading] = useState(true)
 
-  const toggleHelpful = (id: number) => {
-    setHelpfuls((prev) => ({ ...prev, [id]: !prev[id] }))
+  useEffect(() => {
+    userApi.getMyReviews()
+      .then((res) => setReviews(res.data))
+      .catch(() => setReviews([]))
+      .finally(() => setLoading(false))
+  }, [])
+
+  const handleDelete = async (reviewId: number) => {
+    const { reviewsApi } = await import('../api/reviews')
+    try {
+      await reviewsApi.remove(reviewId)
+      setReviews((prev) => prev.filter((r) => r.id !== reviewId))
+    } catch { /* 무시 */ }
   }
 
   return (
     <section>
       <h2 className="text-lg font-semibold mb-1">내 리뷰</h2>
-      <p className="text-sm mb-5" style={{ color: 'var(--color-text-secondary)' }}>
-        총 {MOCK_REVIEWS.length}개의 리뷰
-      </p>
-      <div className="flex flex-col gap-4">
-        {MOCK_REVIEWS.map((review) => (
-          <div
-            key={review.id}
-            className="border rounded-[8px] p-4 flex flex-col gap-3"
-            style={{ borderColor: 'var(--color-border)' }}
-          >
-            {/* 상품 정보 */}
-            <div className="flex items-center gap-3 pb-3 border-b" style={{ borderColor: 'var(--color-border)' }}>
-              <img
-                src={review.product.image}
-                alt={review.product.name}
-                className="w-10 h-10 rounded-[6px] object-cover shrink-0"
-              />
-              <div className="flex-1 min-w-0">
-                <p className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>
-                  {review.product.brand}
+      {loading ? (
+        <div className="flex justify-center py-10">
+          <div className="w-6 h-6 rounded-full border-2 border-t-transparent animate-spin"
+            style={{ borderColor: 'var(--color-primary)', borderTopColor: 'transparent' }} />
+        </div>
+      ) : reviews.length === 0 ? (
+        <p className="text-sm py-10 text-center" style={{ color: 'var(--color-text-disabled)' }}>작성한 리뷰가 없습니다</p>
+      ) : (
+        <>
+          <p className="text-sm mb-5" style={{ color: 'var(--color-text-secondary)' }}>총 {reviews.length}개의 리뷰</p>
+          <div className="flex flex-col gap-4">
+            {reviews.map((review) => (
+              <div key={review.id} className="border rounded-[8px] p-4 flex flex-col gap-3"
+                style={{ borderColor: 'var(--color-border)' }}>
+                {/* 상품 정보 */}
+                <div className="flex items-center gap-3 pb-3 border-b" style={{ borderColor: 'var(--color-border)' }}>
+                  <div className="w-10 h-10 rounded-[6px] shrink-0 flex items-center justify-center"
+                    style={{ background: 'var(--color-border)' }}>
+                    <Package size={14} style={{ color: 'var(--color-text-disabled)' }} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>
+                      {review.product?.seller?.storeName}
+                    </p>
+                    <p className="text-sm font-medium truncate">{review.product?.name}</p>
+                  </div>
+                  <span className="text-xs shrink-0" style={{ color: 'var(--color-text-secondary)' }}>
+                    {new Date(review.createdAt).toLocaleDateString('ko-KR')}
+                  </span>
+                </div>
+
+                <StarRating rating={review.rating} size="sm" showCount={false} />
+
+                {review.images?.length > 0 && (
+                  <div className="flex gap-2">
+                    {review.images.map((src, i) => (
+                      <img key={i} src={src} alt={`리뷰 사진 ${i + 1}`}
+                        className="w-16 h-16 rounded-[6px] object-cover" />
+                    ))}
+                  </div>
+                )}
+
+                <p className="text-sm leading-relaxed" style={{ color: 'var(--color-text-primary)' }}>
+                  {review.content}
                 </p>
-                <p className="text-sm font-medium truncate">{review.product.name}</p>
+
+                <div className="flex items-center justify-end pt-2 border-t" style={{ borderColor: 'var(--color-border)' }}>
+                  <button onClick={() => handleDelete(review.id)}
+                    className="text-xs" style={{ color: 'var(--color-error)' }}>
+                    삭제
+                  </button>
+                </div>
               </div>
-              <span className="text-xs shrink-0" style={{ color: 'var(--color-text-secondary)' }}>
-                {review.date}
-              </span>
-            </div>
-
-            {/* 별점 */}
-            <StarRating rating={review.rating} size="sm" showCount={false} />
-
-            {/* 리뷰 사진 */}
-            {review.images.length > 0 && (
-              <div className="flex gap-2">
-                {review.images.map((src, i) => (
-                  <img
-                    key={i}
-                    src={src}
-                    alt={`리뷰 사진 ${i + 1}`}
-                    className="w-16 h-16 rounded-[6px] object-cover"
-                  />
-                ))}
-              </div>
-            )}
-
-            {/* 리뷰 내용 */}
-            <p className="text-sm leading-relaxed" style={{ color: 'var(--color-text-primary)' }}>
-              {review.content}
-            </p>
-
-            {/* 하단 액션 */}
-            <div className="flex items-center justify-between pt-2 border-t" style={{ borderColor: 'var(--color-border)' }}>
-              <button
-                onClick={() => toggleHelpful(review.id)}
-                className="flex items-center gap-1.5 text-xs transition-colors"
-                style={{ color: helpfuls[review.id] ? 'var(--color-primary)' : 'var(--color-text-secondary)' }}
-              >
-                <ThumbsUp size={13} fill={helpfuls[review.id] ? 'var(--color-primary)' : 'none'} />
-                도움이 됐어요 ({review.helpful + (helpfuls[review.id] ? 1 : 0)})
-              </button>
-              <div className="flex gap-3">
-                <button className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>
-                  수정
-                </button>
-                <button className="text-xs" style={{ color: 'var(--color-error)' }}>
-                  삭제
-                </button>
-              </div>
-            </div>
+            ))}
           </div>
-        ))}
-      </div>
+        </>
+      )}
     </section>
   )
 }
@@ -819,36 +834,17 @@ function ShopSection() {
   const [storeName, setStoreName] = useState('')
   const [description, setDescription] = useState('')
 
-  // 내 상점 찾기: 전체 상점 중 userId === user.id 인 것
+  // 내 상점 조회: GET /users/sellers
   useEffect(() => {
     if (!user) { setLoading(false); return }
-    const fetchMyShop = async () => {
-      try {
-        const res = await sellersApi.getAll()
-        // userId가 일치하는 상점 ID를 찾아 상세 조회
-        // SellerSummary에는 userId가 없으므로 localStorage에 storeId 저장해둠
-        const savedId = localStorage.getItem('myStoreId')
-        if (savedId) {
-          try {
-            const detail = await sellersApi.getOne(Number(savedId))
-            if (detail.data.userId === user.id) {
-              setShop(detail.data)
-              setStoreName(detail.data.storeName)
-              setDescription(detail.data.description)
-            } else {
-              localStorage.removeItem('myStoreId')
-            }
-          } catch {
-            localStorage.removeItem('myStoreId')
-          }
-        }
-      } catch {
-        // 무시
-      } finally {
-        setLoading(false)
-      }
-    }
-    fetchMyShop()
+    userApi.getMySeller()
+      .then((res) => {
+        setShop(res.data)
+        setStoreName(res.data.storeName)
+        setDescription(res.data.description)
+      })
+      .catch(() => { /* 상점 없음 */ })
+      .finally(() => setLoading(false))
   }, [user])
 
   const handleCreate = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -858,7 +854,6 @@ function ShopSection() {
     try {
       const body: CreateSellerBody = { storeName, description }
       const res = await sellersApi.create(body)
-      localStorage.setItem('myStoreId', String(res.data.id))
       setShop(res.data)
       setSaved(true)
       setTimeout(() => setSaved(false), 2500)
@@ -891,7 +886,6 @@ function ShopSection() {
     setDeleting(true)
     try {
       await sellersApi.remove(shop.id)
-      localStorage.removeItem('myStoreId')
       setShop(null)
       setStoreName('')
       setDescription('')

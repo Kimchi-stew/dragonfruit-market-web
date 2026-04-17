@@ -55,6 +55,10 @@ export const authApi = {
     api.post<ApiResponse<AuthTokens>>('/auth/auto-login', { refreshToken }),
 }
 
+import type { ProductSummary } from './products'
+import type { Seller, SellerSummary } from './sellers'
+import type { ReviewDetail } from './reviews'
+
 export const userApi = {
   getProfile: () =>
     api.get<ApiResponse<UserProfile>>('/users/profile'),
@@ -64,4 +68,25 @@ export const userApi = {
 
   updatePassword: (body: UpdatePasswordBody) =>
     api.put<ApiResponse<Record<string, never>>>('/users/profile/password', body),
+
+  getWishProducts: () =>
+    api.get<ApiResponse<ProductSummary[]>>('/users/wish/products'),
+
+  getMySeller: () =>
+    api.get<ApiResponse<Seller>>('/users/sellers'),
+
+  getMyReviews: () =>
+    api.get<ApiResponse<ReviewDetail[]>>('/users/reviews'),
+
+  getMyProducts: () =>
+    api.get<ApiResponse<ProductSummary[]>>('/users/products'),
+
+  getLikedSellers: () =>
+    api.get<ApiResponse<SellerSummary[]>>('/users/likes/sellers'),
+
+  getLikedProducts: (sort?: string) =>
+    api.get<ApiResponse<ProductSummary[]>>(`/users/likes/products${sort ? `?sort=${sort}` : ''}`),
+
+  getFollowedSellers: () =>
+    api.get<ApiResponse<SellerSummary[]>>('/users/follow/sellers'),
 }
