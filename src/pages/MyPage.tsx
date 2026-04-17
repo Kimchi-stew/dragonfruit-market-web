@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Package, Heart, ThumbsUp, MessageSquare, HelpCircle,
-  Ticket, Settings, ChevronDown, ChevronUp, Camera,
+  Ticket, Settings, ChevronDown, ChevronUp, Camera, Store, Trash2,
 } from 'lucide-react'
 import ProductCard from '../components/product/ProductCard'
 import Input from '../components/ui/Input'
@@ -10,6 +10,7 @@ import Button from '../components/ui/Button'
 import StarRating from '../components/ui/StarRating'
 import { MOCK_PRODUCTS } from '../data/mockProducts'
 import { userApi, type UpdateProfileBody, type UpdatePasswordBody } from '../api/auth'
+import { sellersApi, type Seller, type CreateSellerBody } from '../api/sellers'
 import { ApiError } from '../api/client'
 import { useAuth } from '../contexts/AuthContext'
 
@@ -19,6 +20,7 @@ const SIDEBAR_MENU = [
   { icon: MessageSquare, label: '내 리뷰',      key: 'reviews',  badge: null },
   { icon: HelpCircle,    label: '문의',          key: 'inquiry',  badge: null },
   { icon: Ticket,        label: '쿠폰 관리',     key: 'coupons',  badge: 1    },
+  { icon: Store,         label: '내 상점',       key: 'shop',     badge: null },
   { icon: Settings,      label: '계정 설정',     key: 'settings', badge: null },
 ]
 
@@ -800,6 +802,268 @@ function SettingsSection() {
   )
 }
 
+// ── 내 상점 섹션 ──────────────────────────────────────────────
+function ShopSection() {
+  const { user } = useAuth()
+  const navigate = useNavigate()
+
+  const [shop, setShop] = useState<Seller | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const [error, setError] = useState('')
+  const [saved, setSaved] = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState(false)
+
+  // 폼 상태
+  const [storeName, setStoreName] = useState('')
+  const [description, setDescription] = useState('')
+
+  // 내 상점 찾기: 전체 상점 중 userId === user.id 인 것
+  useEffect(() => {
+    if (!user) { setLoading(false); return }
+    const fetchMyShop = async () => {
+      try {
+        const res = await sellersApi.getAll()
+        // userId가 일치하는 상점 ID를 찾아 상세 조회
+        // SellerSummary에는 userId가 없으므로 localStorage에 storeId 저장해둠
+        const savedId = localStorage.getItem('myStoreId')
+        if (savedId) {
+          try {
+            const detail = await sellersApi.getOne(Number(savedId))
+            if (detail.data.userId === user.id) {
+              setShop(detail.data)
+              setStoreName(detail.data.storeName)
+              setDescription(detail.data.description)
+            } else {
+              localStorage.removeItem('myStoreId')
+            }
+          } catch {
+            localStorage.removeItem('myStoreId')
+          }
+        }
+      } catch {
+        // 무시
+      } finally {
+        setLoading(false)
+      }
+    }
+    fetchMyShop()
+  }, [user])
+
+  const handleCreate = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault()
+    setError('')
+    setSaving(true)
+    try {
+      const body: CreateSellerBody = { storeName, description }
+      const res = await sellersApi.create(body)
+      localStorage.setItem('myStoreId', String(res.data.id))
+      setShop(res.data)
+      setSaved(true)
+      setTimeout(() => setSaved(false), 2500)
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : '상점 개설 중 오류가 발생했습니다')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleUpdate = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault()
+    if (!shop) return
+    setError('')
+    setSaving(true)
+    try {
+      const res = await sellersApi.update(shop.id, { storeName, description })
+      setShop(res.data)
+      setSaved(true)
+      setTimeout(() => setSaved(false), 2500)
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : '상점 수정 중 오류가 발생했습니다')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleDelete = async () => {
+    if (!shop) return
+    setDeleting(true)
+    try {
+      await sellersApi.remove(shop.id)
+      localStorage.removeItem('myStoreId')
+      setShop(null)
+      setStoreName('')
+      setDescription('')
+      setConfirmDelete(false)
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : '상점 삭제 중 오류가 발생했습니다')
+    } finally {
+      setDeleting(false)
+    }
+  }
+
+  if (loading) {
+    return (
+      <section>
+        <h2 className="text-lg font-semibold mb-6">내 상점</h2>
+        <div className="flex justify-center py-16">
+          <div className="w-6 h-6 rounded-full border-2 border-t-transparent animate-spin"
+            style={{ borderColor: 'var(--color-primary)', borderTopColor: 'transparent' }} />
+        </div>
+      </section>
+    )
+  }
+
+  return (
+    <section>
+      <h2 className="text-lg font-semibold mb-6">내 상점</h2>
+
+      {shop ? (
+        // 상점이 있는 경우 - 수정 폼
+        <div className="flex flex-col gap-6">
+          {/* 상점 미리보기 링크 */}
+          <div
+            className="flex items-center gap-4 p-4 rounded-xl border"
+            style={{ borderColor: 'var(--color-border)', background: '#FAFAFA' }}
+          >
+            <div
+              className="w-12 h-12 rounded-full flex items-center justify-center shrink-0"
+              style={{ background: 'var(--color-primary)' }}
+            >
+              <Store size={20} color="#fff" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold truncate">{shop.storeName}</p>
+              <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-secondary)' }}>
+                팔로워 {shop.followCount} · 좋아요 {shop.likeCount}
+              </p>
+            </div>
+            <button
+              onClick={() => navigate(`/sellers/${shop.id}`)}
+              className="text-xs font-medium px-3 py-1.5 rounded-full border transition-colors hover:bg-white"
+              style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)' }}
+            >
+              상점 보기
+            </button>
+          </div>
+
+          <form onSubmit={handleUpdate} className="flex flex-col gap-4">
+            <Input
+              label="상점 이름"
+              placeholder="상점 이름 입력"
+              value={storeName}
+              onChange={(e) => setStoreName(e.target.value)}
+              required
+            />
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-medium" style={{ color: 'var(--color-text-secondary)' }}>상점 소개</label>
+              <textarea
+                placeholder="상점 소개를 입력하세요"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                rows={4}
+                className="w-full px-4 py-3 rounded-xl border text-sm resize-none outline-none transition-colors"
+                style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-primary)' }}
+              />
+            </div>
+
+            {error && <p className="text-sm" style={{ color: 'var(--color-error)' }}>{error}</p>}
+
+            <div className="flex items-center gap-3">
+              <Button type="submit" disabled={saving}>
+                {saving ? '저장 중...' : '상점 정보 저장'}
+              </Button>
+              {saved && <p className="text-sm" style={{ color: 'var(--color-success)' }}>저장되었습니다!</p>}
+            </div>
+          </form>
+
+          {/* 삭제 */}
+          <div className="pt-2">
+            {confirmDelete ? (
+              <div
+                className="flex items-center gap-3 p-4 rounded-xl border"
+                style={{ borderColor: 'var(--color-error)', background: 'rgba(244,67,54,0.04)' }}
+              >
+                <p className="flex-1 text-sm" style={{ color: 'var(--color-error)' }}>
+                  정말 상점을 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.
+                </p>
+                <button
+                  onClick={handleDelete}
+                  disabled={deleting}
+                  className="text-sm font-semibold px-3 py-1.5 rounded-lg"
+                  style={{ background: 'var(--color-error)', color: '#fff' }}
+                >
+                  {deleting ? '삭제 중...' : '삭제'}
+                </button>
+                <button
+                  onClick={() => setConfirmDelete(false)}
+                  className="text-sm px-3 py-1.5 rounded-lg"
+                  style={{ color: 'var(--color-text-secondary)' }}
+                >
+                  취소
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setConfirmDelete(true)}
+                className="flex items-center gap-1.5 text-xs"
+                style={{ color: 'var(--color-text-disabled)' }}
+              >
+                <Trash2 size={13} /> 상점 삭제
+              </button>
+            )}
+          </div>
+        </div>
+      ) : (
+        // 상점이 없는 경우 - 개설 폼
+        <div className="flex flex-col gap-6">
+          <div
+            className="flex flex-col items-center gap-2 py-8 rounded-2xl border"
+            style={{ borderColor: 'var(--color-border)', background: '#FAFAFA' }}
+          >
+            <Store size={36} style={{ color: 'var(--color-text-disabled)' }} />
+            <p className="text-sm font-medium" style={{ color: 'var(--color-text-secondary)' }}>
+              아직 개설된 상점이 없습니다
+            </p>
+            <p className="text-xs" style={{ color: 'var(--color-text-disabled)' }}>
+              상점을 개설하고 상품을 판매해보세요
+            </p>
+          </div>
+
+          <form onSubmit={handleCreate} className="flex flex-col gap-4">
+            <Input
+              label="상점 이름"
+              placeholder="상점 이름 입력"
+              value={storeName}
+              onChange={(e) => setStoreName(e.target.value)}
+              required
+            />
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-medium" style={{ color: 'var(--color-text-secondary)' }}>상점 소개</label>
+              <textarea
+                placeholder="상점 소개를 입력하세요"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                rows={4}
+                className="w-full px-4 py-3 rounded-xl border text-sm resize-none outline-none transition-colors"
+                style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-primary)' }}
+              />
+            </div>
+
+            {error && <p className="text-sm" style={{ color: 'var(--color-error)' }}>{error}</p>}
+
+            <Button type="submit" disabled={saving}>
+              {saving ? '개설 중...' : '상점 개설하기'}
+            </Button>
+          </form>
+        </div>
+      )}
+    </section>
+  )
+}
+
 // ── 메인 컴포넌트 ─────────────────────────────────────────────
 export default function MyPage() {
   const [activeMenu, setActiveMenu] = useState('orders')
@@ -811,6 +1075,7 @@ export default function MyPage() {
       case 'reviews':  return <ReviewsSection />
       case 'inquiry':  return <InquirySection />
       case 'coupons':  return <CouponsSection />
+      case 'shop':     return <ShopSection />
       case 'settings': return <SettingsSection />
       default:         return null
     }

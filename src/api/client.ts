@@ -1,4 +1,4 @@
-const BASE_URL = 'http://43.201.188.128:8282'
+const BASE_URL = '/api'
 
 export class ApiError extends Error {
   status?: number
@@ -38,4 +38,7 @@ export const api = {
 
   put: <T>(path: string, body?: unknown) =>
     request<T>(path, { method: 'PUT', body: body ? JSON.stringify(body) : undefined }),
+
+  delete: <T>(path: string) =>
+    request<T>(path, { method: 'DELETE' }),
 }

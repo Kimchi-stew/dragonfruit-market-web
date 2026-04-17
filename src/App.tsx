@@ -12,6 +12,8 @@ const LoginPage         = lazy(() => import('./pages/LoginPage'))
 const RegisterPage      = lazy(() => import('./pages/RegisterPage'))
 const MyPage            = lazy(() => import('./pages/MyPage'))
 const InquiryPage       = lazy(() => import('./pages/InquiryPage'))
+const SellerListPage    = lazy(() => import('./pages/SellerListPage'))
+const SellerDetailPage  = lazy(() => import('./pages/SellerDetailPage'))
 
 function PageLoader() {
   return (
@@ -40,6 +42,8 @@ function App() {
             <Route path="/register"       element={<RegisterPage />} />
             <Route path="/mypage"         element={<MyPage />} />
             <Route path="/inquiry"        element={<InquiryPage />} />
+            <Route path="/sellers"        element={<SellerListPage />} />
+            <Route path="/sellers/:id"    element={<SellerDetailPage />} />
           </Routes>
         </Suspense>
       </main>

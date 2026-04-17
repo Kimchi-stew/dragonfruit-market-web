@@ -9,6 +9,7 @@ const NAV_ITEMS = [
   { label: '패션', to: '/products?category=fashion' },
   { label: '식품', to: '/products?category=food' },
   { label: '가전', to: '/products?category=tool' },
+  { label: '상점', to: '/sellers' },
 ]
 
 export default function GNB() {
@@ -66,7 +67,9 @@ export default function GNB() {
         <nav className="hidden md:flex items-center gap-6 h-full">
           {NAV_ITEMS.map((item) => {
             const itemCategory = item.to.includes('category=') ? item.to.split('category=')[1] : null
-            const isActive = location.pathname.startsWith('/products') && currentCategory === itemCategory
+            const isActive = item.to === '/sellers'
+              ? location.pathname.startsWith('/sellers')
+              : location.pathname.startsWith('/products') && currentCategory === itemCategory
             return (
               <Link
                 key={item.label}
@@ -243,7 +246,9 @@ export default function GNB() {
           <nav className="flex flex-col gap-3">
             {NAV_ITEMS.map((item) => {
               const itemCategory = item.to.includes('category=') ? item.to.split('category=')[1] : null
-              const isActive = location.pathname.startsWith('/products') && currentCategory === itemCategory
+              const isActive = item.to === '/sellers'
+                ? location.pathname.startsWith('/sellers')
+                : location.pathname.startsWith('/products') && currentCategory === itemCategory
               return (
                 <Link
                   key={item.label}
