@@ -36,6 +36,12 @@ jobs:
               docker load < ~/my-frontend.tar.gz
               docker stop frontend || true
               docker rm frontend || true
-              docker run -d -p 80:80 --name frontend --restart always my-frontend
+              docker run -d \
+                -p 80:80 \
+                -p 443:443 \
+                -v /etc/letsencrypt:/etc/letsencrypt:ro \
+                --name frontend \
+                --restart always \
+                my-frontend
               rm ~/my-frontend.tar.gz
           EOF
