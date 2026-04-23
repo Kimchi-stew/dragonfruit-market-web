@@ -1,0 +1,41 @@
+name: Deploy Frontend to EC2
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Build Docker image
+        run: docker build -t my-frontend .
+
+      - name: Save Docker image as tar.gz
+        run: docker save my-frontend | gzip > my-frontend.tar.gz
+
+      - name: Setup SSH key
+        run: |
+          echo "${{ secrets.EC2_KEY }}" > key.pem
+          chmod 600 key.pem
+
+      - name: Transfer image to EC2
+        run: |
+          scp -i key.pem -o StrictHostKeyChecking=no \
+            my-frontend.tar.gz \
+            ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:~/
+
+      - name: Deploy on EC2
+        run: |
+          ssh -i key.pem -o StrictHostKeyChecking=no \
+            ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'EOF'
+              docker load < ~/my-frontend.tar.gz
+              docker stop frontend || true
+              docker rm frontend || true
+              docker run -d -p 80:80 --name frontend --restart always my-frontend
+              rm ~/my-frontend.tar.gz
+          EOF
