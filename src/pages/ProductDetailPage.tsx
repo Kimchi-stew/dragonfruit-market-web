@@ -198,7 +198,24 @@ export default function ProductDetailPage() {
             <Button variant="secondary" size="full" onClick={handleAddCart} disabled={product.stock === 0}>
               장바구니 담기
             </Button>
-            <Button size="full" disabled={product.stock === 0}>바로 구매하기</Button>
+            <Button
+              size="full"
+              disabled={product.stock === 0}
+              onClick={() => navigate('/checkout', {
+                state: {
+                  items: [{
+                    id: product.id,
+                    productId: product.id,
+                    productName: product.name,
+                    quantity,
+                    pricePerItem: product.price,
+                    totalPrice: product.price * quantity,
+                  }],
+                },
+              })}
+            >
+              바로 구매하기
+            </Button>
             <button
               onClick={handleWish}
               className="w-12 h-12 shrink-0 flex items-center justify-center border rounded-full"

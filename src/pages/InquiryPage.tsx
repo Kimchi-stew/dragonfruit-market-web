@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { Paperclip, Send, X, ChevronDown } from 'lucide-react'
 import Button from '../components/ui/Button'
 import Breadcrumb from '../components/ui/Breadcrumb'
+import { useAuth } from '../contexts/AuthContext'
 
 const INQUIRY_TYPES = [
   '상품 문의',
@@ -15,6 +16,7 @@ const INQUIRY_TYPES = [
 
 export default function InquiryPage() {
   const navigate = useNavigate()
+  const { user } = useAuth()
   const [type, setType] = useState('')
   const [typeOpen, setTypeOpen] = useState(false)
   const [subject, setSubject] = useState('')
@@ -103,7 +105,7 @@ export default function InquiryPage() {
               보낸이
             </span>
             <span className="text-sm" style={{ color: 'var(--color-text-primary)' }}>
-              user@example.com
+              {user?.email ?? ''}
             </span>
           </div>
 

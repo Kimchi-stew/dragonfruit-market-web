@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Package, Heart, MessageSquare, HelpCircle,
-  Ticket, Settings, ChevronDown, ChevronUp, Camera, Store, Trash2,
+  Ticket, Settings, Camera, Store, Trash2,
 } from 'lucide-react'
 import ProductCard from '../components/product/ProductCard'
 import Input from '../components/ui/Input'
@@ -18,138 +18,12 @@ const SIDEBAR_MENU = [
   { icon: Heart,         label: '찜한 상품',    key: 'wishlist', badge: null },
   { icon: MessageSquare, label: '내 리뷰',      key: 'reviews',  badge: null },
   { icon: HelpCircle,    label: '문의',          key: 'inquiry',  badge: null },
-  { icon: Ticket,        label: '쿠폰 관리',     key: 'coupons',  badge: 1    },
+  { icon: Ticket,        label: '쿠폰 관리',     key: 'coupons',  badge: null },
   { icon: Store,         label: '내 상점',       key: 'shop',     badge: null },
   { icon: Settings,      label: '계정 설정',     key: 'settings', badge: null },
 ]
 
 const ORDER_TABS = ['전체', '결제완료', '배송중', '배송완료', '취소신청']
-const ORDER_STATUS_STYLE: Record<string, { label: string; color: string }> = {
-  delivered: { label: '배송완료', color: 'var(--color-success)' },
-  shipping:  { label: '배송중',   color: '#2196F3' },
-  paid:      { label: '결제완료', color: 'var(--color-star)' },
-}
-
-const MOCK_ORDERS = [
-  { id: 'ORD-20260411', date: '2026.04.11', status: 'delivered', product: MOCK_PRODUCTS[0] },
-  { id: 'ORD-20260409', date: '2026.04.09', status: 'shipping',  product: MOCK_PRODUCTS[1] },
-  { id: 'ORD-20260407', date: '2026.04.07', status: 'paid',      product: MOCK_PRODUCTS[2] },
-]
-
-
-const MOCK_REVIEWS = [
-  {
-    id: 1,
-    product: MOCK_PRODUCTS[0],
-    rating: 5,
-    date: '2026.04.11',
-    content: '정말 좋은 제품이에요! 보습력이 오래 지속되고 피부가 촉촉해졌어요. 재구매 의사 있습니다.',
-    helpful: 12,
-    images: [`https://picsum.photos/seed/rev1a/80/80`, `https://picsum.photos/seed/rev1b/80/80`],
-  },
-  {
-    id: 2,
-    product: MOCK_PRODUCTS[1],
-    rating: 4,
-    date: '2026.04.09',
-    content: '배송도 빠르고 제품 품질도 만족스럽습니다. 다음에도 구매할 것 같아요.',
-    helpful: 5,
-    images: [],
-  },
-  {
-    id: 3,
-    product: MOCK_PRODUCTS[2],
-    rating: 4.5,
-    date: '2026.03.28',
-    content: '사용감이 좋고 발림성이 뛰어나요. 향도 은은해서 좋아요.',
-    helpful: 8,
-    images: [`https://picsum.photos/seed/rev3a/80/80`],
-  },
-]
-
-type InquiryStatus = 'answered' | 'pending'
-const MOCK_INQUIRIES: {
-  id: number
-  product: typeof MOCK_PRODUCTS[0]
-  title: string
-  date: string
-  status: InquiryStatus
-  question: string
-  answer: string | null
-}[] = [
-  {
-    id: 1,
-    product: MOCK_PRODUCTS[3],
-    title: '배송 관련 문의',
-    date: '2026.04.10',
-    status: 'answered',
-    question: '주문한 지 3일이 지났는데 아직 배송이 시작되지 않았어요. 언제 출발하나요?',
-    answer:
-      '안녕하세요! 고객님의 주문은 현재 출고 준비 중입니다. 내일 오전 중 발송될 예정이오니 조금만 기다려 주세요. 감사합니다.',
-  },
-  {
-    id: 2,
-    product: MOCK_PRODUCTS[0],
-    title: '사이즈 교환 가능한가요?',
-    date: '2026.04.08',
-    status: 'answered',
-    question: 'M 사이즈를 주문했는데 생각보다 작아서 L로 교환하고 싶어요.',
-    answer:
-      '배송 완료 후 7일 이내에 교환 신청이 가능합니다. 마이페이지 > 주문 내역에서 교환 신청을 진행해 주세요.',
-  },
-  {
-    id: 3,
-    product: MOCK_PRODUCTS[4],
-    title: '성분 문의',
-    date: '2026.04.05',
-    status: 'pending',
-    question: '알러지가 있는데 특정 성분이 포함되어 있는지 확인하고 싶어요.',
-    answer: null,
-  },
-]
-
-const MOCK_COUPONS = [
-  {
-    id: 1,
-    title: '신규 가입 축하 쿠폰',
-    discount: '10%',
-    type: 'percent' as const,
-    minOrder: 20000,
-    expiry: '2026.05.31',
-    used: false,
-    color: '#7C3AED',
-  },
-  {
-    id: 2,
-    title: '생일 특별 할인',
-    discount: '5,000원',
-    type: 'amount' as const,
-    minOrder: 30000,
-    expiry: '2026.04.30',
-    used: false,
-    color: '#FF3D87',
-  },
-  {
-    id: 3,
-    title: '리뷰 작성 감사 쿠폰',
-    discount: '3,000원',
-    type: 'amount' as const,
-    minOrder: 15000,
-    expiry: '2026.03.31',
-    used: true,
-    color: '#9E9E9E',
-  },
-  {
-    id: 4,
-    title: '뷰티 카테고리 전용',
-    discount: '15%',
-    type: 'percent' as const,
-    minOrder: 50000,
-    expiry: '2026.06.30',
-    used: false,
-    color: '#E65100',
-  },
-]
 
 // ── 주문 내역 ─────────────────────────────────────────────────
 function OrdersSection() {
@@ -173,44 +47,9 @@ function OrdersSection() {
           </button>
         ))}
       </div>
-      <div className="flex flex-col gap-4">
-        {MOCK_ORDERS.map((order) => {
-          const statusInfo = ORDER_STATUS_STYLE[order.status]
-          return (
-            <div
-              key={order.id}
-              className="border rounded-[8px] p-4"
-              style={{ borderColor: 'var(--color-border)' }}
-            >
-              <div className="flex items-center justify-between mb-3">
-                <span
-                  className="text-xs font-bold px-2 py-0.5 rounded-full"
-                  style={{ background: `${statusInfo.color}20`, color: statusInfo.color }}
-                >
-                  {statusInfo.label}
-                </span>
-                <div className="text-right">
-                  <p className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>{order.date}</p>
-                  <p className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>{order.id}</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-3">
-                <img
-                  src={order.product.image}
-                  alt={order.product.name}
-                  className="w-12 h-12 rounded-[8px] object-cover"
-                />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium truncate">{order.product.name}</p>
-                  <p className="text-sm font-bold mt-0.5">{order.product.price.toLocaleString()}원</p>
-                </div>
-                <button className="text-xs shrink-0" style={{ color: 'var(--color-primary)' }}>
-                  주문상세 보기 &gt;
-                </button>
-              </div>
-            </div>
-          )
-        })}
+      <div className="flex flex-col items-center justify-center py-16 gap-2">
+        <Package size={36} style={{ color: 'var(--color-text-disabled)' }} />
+        <p className="text-sm" style={{ color: 'var(--color-text-disabled)' }}>주문 내역이 없습니다</p>
       </div>
     </section>
   )
@@ -336,110 +175,17 @@ function ReviewsSection() {
 
 // ── 문의 ──────────────────────────────────────────────────────
 function InquirySection() {
-  const [expanded, setExpanded] = useState<number | null>(null)
   const navigate = useNavigate()
 
   return (
     <section>
       <div className="flex items-center justify-between mb-5">
-        <div>
-          <h2 className="text-lg font-semibold mb-1">문의</h2>
-          <p className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>
-            총 {MOCK_INQUIRIES.length}건의 문의
-          </p>
-        </div>
+        <h2 className="text-lg font-semibold">문의</h2>
         <Button size="sm" variant="secondary" onClick={() => navigate('/inquiry')}>문의하기</Button>
       </div>
-
-      <div className="flex flex-col gap-3">
-        {MOCK_INQUIRIES.map((item) => (
-          <div
-            key={item.id}
-            className="border rounded-[8px] overflow-hidden"
-            style={{ borderColor: 'var(--color-border)' }}
-          >
-            {/* 헤더 */}
-            <button
-              className="w-full flex items-center gap-3 p-4 text-left transition-colors hover:bg-black/[0.02]"
-              onClick={() => setExpanded(expanded === item.id ? null : item.id)}
-            >
-              <img
-                src={item.product.image}
-                alt={item.product.name}
-                className="w-10 h-10 rounded-[6px] object-cover shrink-0"
-              />
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-0.5">
-                  <span
-                    className="text-[11px] font-bold px-1.5 py-0.5 rounded-full shrink-0"
-                    style={
-                      item.status === 'answered'
-                        ? { background: 'rgba(46,125,50,0.1)', color: 'var(--color-success)' }
-                        : { background: 'rgba(255,61,135,0.1)', color: 'var(--color-primary)' }
-                    }
-                  >
-                    {item.status === 'answered' ? '답변완료' : '답변대기'}
-                  </span>
-                  <span className="text-sm font-medium truncate">{item.title}</span>
-                </div>
-                <p className="text-xs truncate" style={{ color: 'var(--color-text-secondary)' }}>
-                  {item.product.name}
-                </p>
-              </div>
-              <div className="flex items-center gap-2 shrink-0">
-                <span className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>
-                  {item.date}
-                </span>
-                {expanded === item.id ? (
-                  <ChevronUp size={16} style={{ color: 'var(--color-text-secondary)' }} />
-                ) : (
-                  <ChevronDown size={16} style={{ color: 'var(--color-text-secondary)' }} />
-                )}
-              </div>
-            </button>
-
-            {/* 상세 내용 */}
-            {expanded === item.id && (
-              <div
-                className="border-t px-4 pb-4 flex flex-col gap-3"
-                style={{ borderColor: 'var(--color-border)' }}
-              >
-                {/* 질문 */}
-                <div className="pt-3">
-                  <p className="text-xs font-semibold mb-1.5" style={{ color: 'var(--color-text-secondary)' }}>
-                    Q. 문의 내용
-                  </p>
-                  <p className="text-sm leading-relaxed" style={{ color: 'var(--color-text-primary)' }}>
-                    {item.question}
-                  </p>
-                </div>
-                {/* 답변 */}
-                {item.answer ? (
-                  <div
-                    className="rounded-[8px] p-3"
-                    style={{ background: 'var(--color-surface)' }}
-                  >
-                    <p className="text-xs font-semibold mb-1.5" style={{ color: 'var(--color-primary)' }}>
-                      A. 판매자 답변
-                    </p>
-                    <p className="text-sm leading-relaxed" style={{ color: 'var(--color-text-primary)' }}>
-                      {item.answer}
-                    </p>
-                  </div>
-                ) : (
-                  <div
-                    className="rounded-[8px] p-3 text-center"
-                    style={{ background: 'var(--color-surface)' }}
-                  >
-                    <p className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>
-                      답변을 준비 중입니다. 조금만 기다려 주세요.
-                    </p>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        ))}
+      <div className="flex flex-col items-center justify-center py-16 gap-2">
+        <HelpCircle size={36} style={{ color: 'var(--color-text-disabled)' }} />
+        <p className="text-sm" style={{ color: 'var(--color-text-disabled)' }}>문의 내역이 없습니다</p>
       </div>
     </section>
   )
@@ -449,23 +195,16 @@ function InquirySection() {
 function CouponsSection() {
   const [tab, setTab] = useState<'available' | 'used'>('available')
 
-  const available = MOCK_COUPONS.filter((c) => !c.used)
-  const used = MOCK_COUPONS.filter((c) => c.used)
-  const list = tab === 'available' ? available : used
-
   return (
     <section>
       <h2 className="text-lg font-semibold mb-4">쿠폰 관리</h2>
 
-      {/* 탭 */}
       <div className="flex gap-4 border-b mb-5" style={{ borderColor: 'var(--color-border)' }}>
         {[
-          { key: 'available' as const, label: `사용 가능 (${available.length})` },
-          { key: 'used' as const,      label: `사용 완료 (${used.length})` },
+          { key: 'available' as const, label: '사용 가능 (0)' },
+          { key: 'used' as const,      label: '사용 완료 (0)' },
         ].map(({ key, label }) => (
-          <button
-            key={key}
-            onClick={() => setTab(key)}
+          <button key={key} onClick={() => setTab(key)}
             className="pb-3 text-sm font-medium border-b-2 transition-colors"
             style={
               tab === key
@@ -478,65 +217,18 @@ function CouponsSection() {
         ))}
       </div>
 
-      {/* 쿠폰 입력 */}
       {tab === 'available' && (
         <div className="flex gap-2 mb-5">
-          <input
-            type="text"
-            placeholder="쿠폰 코드를 입력하세요"
+          <input type="text" placeholder="쿠폰 코드를 입력하세요"
             className="flex-1 h-10 px-3 text-sm border-2 rounded-xl outline-none transition-all focus:border-[#FF3D87]"
-            style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-primary)' }}
-          />
+            style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-primary)' }} />
           <Button size="sm">등록</Button>
         </div>
       )}
 
-      {/* 쿠폰 목록 */}
-      <div className="flex flex-col gap-3">
-        {list.map((coupon) => (
-          <div
-            key={coupon.id}
-            className="flex overflow-hidden rounded-[8px] border"
-            style={{
-              borderColor: coupon.used ? 'var(--color-border)' : coupon.color + '40',
-              opacity: coupon.used ? 0.6 : 1,
-            }}
-          >
-            {/* 왼쪽 색상 띠 */}
-            <div
-              className="w-2 shrink-0"
-              style={{ background: coupon.used ? 'var(--color-border)' : coupon.color }}
-            />
-            {/* 내용 */}
-            <div className="flex-1 flex items-center justify-between px-4 py-3 gap-4">
-              <div className="flex flex-col gap-1">
-                <p className="text-sm font-semibold" style={{ color: 'var(--color-text-primary)' }}>
-                  {coupon.title}
-                </p>
-                <p className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>
-                  {coupon.minOrder.toLocaleString()}원 이상 구매 시 사용 가능
-                </p>
-                <p className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>
-                  만료일: {coupon.expiry}
-                </p>
-              </div>
-              <div className="shrink-0 text-right">
-                <p
-                  className="text-xl font-bold"
-                  style={{ color: coupon.used ? 'var(--color-text-disabled)' : coupon.color }}
-                >
-                  {coupon.discount}
-                </p>
-                <p
-                  className="text-xs font-medium"
-                  style={{ color: coupon.used ? 'var(--color-text-disabled)' : coupon.color }}
-                >
-                  {coupon.type === 'percent' ? '할인' : '할인쿠폰'}
-                </p>
-              </div>
-            </div>
-          </div>
-        ))}
+      <div className="flex flex-col items-center justify-center py-16 gap-2">
+        <Ticket size={36} style={{ color: 'var(--color-text-disabled)' }} />
+        <p className="text-sm" style={{ color: 'var(--color-text-disabled)' }}>쿠폰이 없습니다</p>
       </div>
     </section>
   )
@@ -1060,6 +752,7 @@ function ShopSection() {
 
 // ── 메인 컴포넌트 ─────────────────────────────────────────────
 export default function MyPage() {
+  const { user } = useAuth()
   const [activeMenu, setActiveMenu] = useState('orders')
 
   const renderContent = () => {
@@ -1089,12 +782,12 @@ export default function MyPage() {
               className="w-16 h-16 rounded-full flex items-center justify-center text-xl font-bold text-white"
               style={{ background: 'var(--color-primary)' }}
             >
-              U
+              {user?.nickname?.charAt(0).toUpperCase() ?? 'U'}
             </div>
             <div className="text-center">
-              <p className="text-sm font-semibold">닉네임</p>
+              <p className="text-sm font-semibold">{user?.nickname ?? ''}</p>
               <p className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>
-                user@example.com
+                {user?.email ?? ''}
               </p>
             </div>
             <button

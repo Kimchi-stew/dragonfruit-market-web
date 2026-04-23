@@ -1,18 +1,29 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import Input from '../components/ui/Input'
 import Button from '../components/ui/Button'
+import type { CartItem } from '../api/cart'
 
 const STEPS = ['장바구니 확인', '주문 정보 입력', '주문 완료']
 const PAYMENT_METHODS = ['신용카드', '가상계좌', '포스페이', '무통장입금']
 
+interface CheckoutItem extends CartItem {
+  checked?: boolean
+}
+
 export default function CheckoutPage() {
+  const navigate = useNavigate()
+  const location = useLocation()
+  const items: CheckoutItem[] = (location.state as { items: CheckoutItem[] } | null)?.items ?? []
+
   const [payMethod, setPayMethod] = useState('신용카드')
   const [agreed, setAgreed] = useState(false)
-  const navigate = useNavigate()
+
+  const subtotal = items.reduce((sum, i) => sum + i.totalPrice, 0)
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
+    // TODO: POST /orders API 연동 후 주문 완료 페이지로 이동
     navigate('/')
   }
 
@@ -59,6 +70,36 @@ export default function CheckoutPage() {
         <div className="flex flex-col lg:flex-row gap-6">
           {/* Form */}
           <div className="flex-1 flex flex-col gap-8">
+            {/* 주문 상품 */}
+            {items.length > 0 && (
+              <section>
+                <h2 className="text-base font-semibold mb-4">주문 상품 ({items.length}개)</h2>
+                <div className="flex flex-col gap-3">
+                  {items.map((item) => (
+                    <div
+                      key={item.id}
+                      className="flex items-center gap-3 p-3 rounded-[8px]"
+                      style={{ background: 'var(--color-surface)' }}
+                    >
+                      <div
+                        className="w-12 h-12 rounded-[6px] shrink-0 flex items-center justify-center"
+                        style={{ background: 'var(--color-border)' }}
+                      />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">{item.productName}</p>
+                        <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-secondary)' }}>
+                          {item.pricePerItem.toLocaleString()}원 × {item.quantity}개
+                        </p>
+                      </div>
+                      <span className="text-sm font-semibold shrink-0">
+                        {item.totalPrice.toLocaleString()}원
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
+
             {/* Shipping */}
             <section>
               <h2 className="text-base font-semibold mb-4">배송지 정보</h2>
@@ -123,11 +164,7 @@ export default function CheckoutPage() {
               <h2 className="text-base font-semibold mb-1">주문 요약</h2>
               <div className="flex justify-between text-sm">
                 <span style={{ color: 'var(--color-text-secondary)' }}>상품 금액</span>
-                <span>65,900원</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span style={{ color: 'var(--color-text-secondary)' }}>할인 금액</span>
-                <span style={{ color: 'var(--color-primary)' }}>-6,590원</span>
+                <span>{subtotal.toLocaleString()}원</span>
               </div>
               <div className="flex justify-between text-sm">
                 <span style={{ color: 'var(--color-text-secondary)' }}>배송비</span>
@@ -138,10 +175,10 @@ export default function CheckoutPage() {
                 style={{ borderColor: 'var(--color-border)' }}
               >
                 <span>최종 결제금액</span>
-                <span className="text-xl">59,310원</span>
+                <span className="text-xl">{subtotal.toLocaleString()}원</span>
               </div>
-              <Button type="submit" size="full" disabled={!agreed} className="mt-2 text-base">
-                59,310원 결제하기
+              <Button type="submit" size="full" disabled={!agreed || items.length === 0} className="mt-2 text-base">
+                {subtotal.toLocaleString()}원 결제하기
               </Button>
             </div>
           </div>

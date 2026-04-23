@@ -30,14 +30,6 @@ function saveUser(user: User) {
   localStorage.setItem('user', JSON.stringify(user))
 }
 
-function loadUser(): User | null {
-  try {
-    const raw = localStorage.getItem('user')
-    return raw ? JSON.parse(raw) : null
-  } catch {
-    return null
-  }
-}
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)

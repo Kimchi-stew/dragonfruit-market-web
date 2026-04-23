@@ -7,7 +7,7 @@ import {
 import Button from '../components/ui/Button'
 import CategoryChip from '../components/ui/CategoryChip'
 import ProductCard from '../components/product/ProductCard'
-import { MOCK_PRODUCTS } from '../data/mockProducts'
+import { productsApi, type ProductSummary } from '../api/products'
 
 const CATEGORIES = [
   { label: '뷰티',    icon: <Sparkles size={22} strokeWidth={1.8} />,    color: 'var(--color-cat-beauty)',  iconColor: '#C2185B', value: 'beauty' },
@@ -102,8 +102,26 @@ export default function HomePage() {
   const [activeSlide, setActiveSlide] = useState(0)
   const [progressKey, setProgressKey] = useState(0)
   const [activeCategory, setActiveCategory] = useState<string | null>(null)
+  const [popularProducts, setPopularProducts] = useState<ProductSummary[]>([])
+  const [newProducts, setNewProducts] = useState<ProductSummary[]>([])
+  const [recProducts, setRecProducts] = useState<ProductSummary[]>([])
   const navigate = useNavigate()
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  useEffect(() => {
+    productsApi.getAll({ size: 4, sortType: 'POPULAR' })
+      .then((res) => setPopularProducts(res.data.content ?? []))
+      .catch(() => {})
+    productsApi.getAll({ size: 4, sortType: 'RECENT' })
+      .then((res) => setNewProducts(res.data.content ?? []))
+      .catch(() => {})
+    productsApi.getAll({ size: 8, sortType: 'POPULAR' })
+      .then((res) => {
+        const all = res.data.content ?? []
+        setRecProducts(all.slice(4, 8).length > 0 ? all.slice(4, 8) : all.slice(0, 4))
+      })
+      .catch(() => {})
+  }, [])
 
   const goTo = useCallback((idx: number) => {
     setActiveSlide(idx)
@@ -306,7 +324,7 @@ export default function HomePage() {
         <section ref={popularRef} className="reveal">
           <SectionHeader title="인기 상품 🔥" />
           <div className="grid grid-cols-2 md:grid-cols-4 gap-5">
-            {MOCK_PRODUCTS.slice(0, 4).map((p, i) => (
+            {popularProducts.map((p, i) => (
               <div key={p.id} className="reveal visible" style={{ transitionDelay: `${i * 80}ms` }}>
                 <ProductCard product={p} />
               </div>
@@ -341,7 +359,7 @@ export default function HomePage() {
         <section ref={newRef} className="reveal">
           <SectionHeader title="신상품 ✨" />
           <div className="grid grid-cols-2 md:grid-cols-4 gap-5">
-            {MOCK_PRODUCTS.slice(4, 8).map((p, i) => (
+            {newProducts.map((p, i) => (
               <div key={p.id} className="reveal visible" style={{ transitionDelay: `${i * 80}ms` }}>
                 <ProductCard product={p} />
               </div>
@@ -356,7 +374,7 @@ export default function HomePage() {
             sub="행동 분석을 기반으로 상품을 추천해드립니다"
           />
           <div className="grid grid-cols-2 md:grid-cols-4 gap-5">
-            {[...MOCK_PRODUCTS].reverse().slice(0, 4).map((p, i) => (
+            {recProducts.map((p, i) => (
               <div key={p.id} className="reveal visible" style={{ transitionDelay: `${i * 80}ms` }}>
                 <ProductCard product={p} />
               </div>

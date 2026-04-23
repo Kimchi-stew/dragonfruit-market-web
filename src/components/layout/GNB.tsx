@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { Search, Bell, ShoppingCart, User, Menu, X, LogOut } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { alarmApi, type AlarmItem } from '../../api/alarm'
+import { cartApi } from '../../api/cart'
 
 const NAV_ITEMS = [
   { label: '전체', to: '/products' },
@@ -20,6 +21,7 @@ export default function GNB() {
   const [bellOpen, setBellOpen] = useState(false)
   const [alarms, setAlarms] = useState<AlarmItem[]>([])
   const [unreadCount, setUnreadCount] = useState(0)
+  const [cartCount, setCartCount] = useState(0)
   const bellRef = useRef<HTMLDivElement>(null)
   const navigate = useNavigate()
   const location = useLocation()
@@ -38,12 +40,15 @@ export default function GNB() {
     return () => document.removeEventListener('mousedown', handleClick)
   }, [])
 
-  // 로그인 시 읽지 않은 알림 수 조회
+  // 로그인 시 읽지 않은 알림 수 / 장바구니 수량 조회
   useEffect(() => {
-    if (!user) { setUnreadCount(0); return }
+    if (!user) { setUnreadCount(0); setCartCount(0); return }
     alarmApi.getUnreadCount()
       .then((count) => setUnreadCount(count))
       .catch(() => setUnreadCount(0))
+    cartApi.get()
+      .then((res) => setCartCount(res.data.totalQuantity ?? 0))
+      .catch(() => setCartCount(0))
   }, [user])
 
   // 벨 열릴 때 알림 목록 조회
@@ -140,7 +145,7 @@ export default function GNB() {
           </form>
 
           {/* 알림 벨 */}
-          <div ref={bellRef} className="relative hidden sm:block">
+          <div ref={bellRef} className={`relative ${user ? 'hidden sm:block' : 'hidden'}`}>
             <button
               onClick={() => setBellOpen((v) => !v)}
               className="relative w-9 h-9 rounded-full flex items-center justify-center transition-colors hover:bg-[#F5F5F5]"
@@ -203,12 +208,14 @@ export default function GNB() {
             className="w-9 h-9 rounded-full flex items-center justify-center relative transition-colors hover:bg-[#F5F5F5] hidden sm:flex"
           >
             <ShoppingCart size={19} style={{ color: 'var(--color-text-secondary)' }} />
-            <span
-              className="absolute top-0.5 right-0.5 min-w-[16px] h-4 rounded-full flex items-center justify-center text-white font-bold"
-              style={{ fontSize: 9, background: 'var(--color-primary)', padding: '0 3px' }}
-            >
-              3
-            </span>
+            {cartCount > 0 && (
+              <span
+                className="absolute top-0.5 right-0.5 min-w-[16px] h-4 rounded-full flex items-center justify-center text-white font-bold"
+                style={{ fontSize: 9, background: 'var(--color-primary)', padding: '0 3px' }}
+              >
+                {cartCount > 99 ? '99+' : cartCount}
+              </span>
+            )}
           </Link>
 
           {/* 로그인 상태에 따른 버튼 */}

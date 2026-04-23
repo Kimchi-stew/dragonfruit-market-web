@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { X, ShoppingCart } from 'lucide-react'
 import Button from '../components/ui/Button'
 import { cartApi, type CartItem, type Cart } from '../api/cart'
@@ -9,6 +9,7 @@ interface CartItemState extends CartItem {
 }
 
 export default function CartPage() {
+  const navigate = useNavigate()
   const [cart, setCart] = useState<Cart | null>(null)
   const [items, setItems] = useState<CartItemState[]>([])
   const [loading, setLoading] = useState(true)
@@ -142,9 +143,14 @@ export default function CartPage() {
               <span>최종 결제금액</span>
               <span className="text-xl">{subtotal.toLocaleString()}원</span>
             </div>
-            <Link to="/checkout">
-              <Button size="full" className="mt-2">주문하기</Button>
-            </Link>
+            <Button
+              size="full"
+              className="mt-2"
+              disabled={checkedItems.length === 0}
+              onClick={() => navigate('/checkout', { state: { items: checkedItems } })}
+            >
+              주문하기 ({checkedItems.length}개)
+            </Button>
           </div>
         </div>
       </div>
