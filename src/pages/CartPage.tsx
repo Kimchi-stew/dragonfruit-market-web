@@ -3,9 +3,12 @@ import { Link, useNavigate } from 'react-router-dom'
 import { X, ShoppingCart } from 'lucide-react'
 import Button from '../components/ui/Button'
 import { cartApi, type CartItem, type Cart } from '../api/cart'
+import { productsApi } from '../api/products'
+import { notifyCartChange } from '../utils/cartEvent'
 
 interface CartItemState extends CartItem {
   checked: boolean
+  productImage?: string
 }
 
 export default function CartPage() {
@@ -14,13 +17,27 @@ export default function CartPage() {
   const [items, setItems] = useState<CartItemState[]>([])
   const [loading, setLoading] = useState(true)
   const [removing, setRemoving] = useState<number | null>(null)
+  const [adjusting, setAdjusting] = useState<number | null>(null)
 
   useEffect(() => {
     const fetchCart = async () => {
       try {
         const res = await cartApi.get()
         setCart(res.data)
-        setItems(res.data.items.map((item) => ({ ...item, checked: true })))
+        const baseItems: CartItemState[] = res.data.items.map((item) => ({ ...item, checked: true }))
+        setItems(baseItems)
+
+        // 상품 이미지 병렬 로드
+        const results = await Promise.allSettled(
+          res.data.items.map((i) => productsApi.getOne(i.productId))
+        )
+        const imageMap: Record<number, string> = {}
+        results.forEach((r, idx) => {
+          if (r.status === 'fulfilled') {
+            imageMap[res.data.items[idx].productId] = r.value.data.images?.[0] ?? ''
+          }
+        })
+        setItems((prev) => prev.map((i) => ({ ...i, productImage: imageMap[i.productId] })))
       } catch {
         setCart(null)
       } finally {
@@ -43,11 +60,40 @@ export default function CartPage() {
     setRemoving(item.id)
     try {
       await cartApi.remove(item.productId, item.quantity)
+      notifyCartChange(-item.quantity)
       setItems((prev) => prev.filter((i) => i.id !== item.id))
-    } catch {
-      // 실패해도 낙관적 업데이트 유지 안 함
-    } finally {
+    } catch { /* 무시 */ } finally {
       setRemoving(null)
+    }
+  }
+
+  const adjust = async (item: CartItemState, delta: 1 | -1) => {
+    if (adjusting === item.id) return
+    setAdjusting(item.id)
+    try {
+      if (delta === 1) {
+        await cartApi.add(item.productId, 1)
+        notifyCartChange(1)
+        setItems((prev) => prev.map((i) =>
+          i.id === item.id
+            ? { ...i, quantity: i.quantity + 1, totalPrice: (i.quantity + 1) * i.pricePerItem }
+            : i
+        ))
+      } else {
+        if (item.quantity <= 1) {
+          await remove(item)
+          return
+        }
+        await cartApi.remove(item.productId, 1)
+        notifyCartChange(-1)
+        setItems((prev) => prev.map((i) =>
+          i.id === item.id
+            ? { ...i, quantity: i.quantity - 1, totalPrice: (i.quantity - 1) * i.pricePerItem }
+            : i
+        ))
+      }
+    } catch { /* 무시 */ } finally {
+      setAdjusting(null)
     }
   }
 
@@ -99,24 +145,53 @@ export default function CartPage() {
                 <input type="checkbox" checked={item.checked} onChange={() => toggle(item.id)}
                   className="w-4 h-4 mt-1 accent-[var(--color-primary)] cursor-pointer shrink-0" />
 
-                <div className="w-16 h-16 rounded-[8px] shrink-0 flex items-center justify-center"
-                  style={{ background: 'var(--color-border)' }}>
-                  <ShoppingCart size={20} style={{ color: 'var(--color-text-disabled)' }} />
-                </div>
+                {item.productImage ? (
+                  <img
+                    src={item.productImage}
+                    alt={item.productName}
+                    className="w-16 h-16 rounded-[8px] shrink-0 object-cover"
+                  />
+                ) : (
+                  <div className="w-16 h-16 rounded-[8px] shrink-0 flex items-center justify-center"
+                    style={{ background: 'var(--color-border)' }}>
+                    <ShoppingCart size={20} style={{ color: 'var(--color-text-disabled)' }} />
+                  </div>
+                )}
 
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium truncate">{item.productName}</p>
                   <p className="text-sm font-bold mt-1">
                     {item.pricePerItem.toLocaleString()}원
                   </p>
-                  <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-secondary)' }}>
-                    수량: {item.quantity}개 · 합계 {item.totalPrice.toLocaleString()}원
-                  </p>
+                  <div className="flex items-center gap-2 mt-1.5">
+                    <div className="flex items-center border rounded-lg overflow-hidden"
+                      style={{ borderColor: 'var(--color-border)' }}>
+                      <button
+                        onClick={() => adjust(item, -1)}
+                        disabled={adjusting === item.id || removing === item.id}
+                        className="w-7 h-7 flex items-center justify-center text-sm transition-colors hover:bg-[#F5F5F5] disabled:opacity-40"
+                        style={{ color: 'var(--color-text-secondary)' }}
+                      >−</button>
+                      <span className="w-8 text-center text-sm font-medium"
+                        style={{ color: 'var(--color-text-primary)' }}>
+                        {item.quantity}
+                      </span>
+                      <button
+                        onClick={() => adjust(item, 1)}
+                        disabled={adjusting === item.id || removing === item.id}
+                        className="w-7 h-7 flex items-center justify-center text-sm transition-colors hover:bg-[#F5F5F5] disabled:opacity-40"
+                        style={{ color: 'var(--color-text-secondary)' }}
+                      >+</button>
+                    </div>
+                    <span className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>
+                      합계 {item.totalPrice.toLocaleString()}원
+                    </span>
+                  </div>
                 </div>
 
                 <button
                   onClick={() => remove(item)}
-                  disabled={removing === item.id}
+                  disabled={removing === item.id || adjusting === item.id}
                   className="shrink-0 transition-opacity disabled:opacity-40"
                 >
                   <X size={18} style={{ color: 'var(--color-text-secondary)' }} />
