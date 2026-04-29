@@ -4,6 +4,8 @@ import { Paperclip, Send, X, ChevronDown } from 'lucide-react'
 import Button from '../components/ui/Button'
 import Breadcrumb from '../components/ui/Breadcrumb'
 import { useAuth } from '../contexts/AuthContext'
+import { inquiriesApi } from '../api/inquiries'
+import { ApiError } from '../api/client'
 
 const INQUIRY_TYPES = [
   '상품 문의',
@@ -23,6 +25,8 @@ export default function InquiryPage() {
   const [content, setContent] = useState('')
   const [files, setFiles] = useState<File[]>([])
   const [sent, setSent] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
 
   const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files) return
@@ -35,9 +39,21 @@ export default function InquiryPage() {
     setFiles((prev) => prev.filter((_, i) => i !== idx))
   }
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
-    setSent(true)
+    setError('')
+    setLoading(true)
+    try {
+      await inquiriesApi.create({
+        title: type ? `[${type}] ${subject}` : subject,
+        content,
+      })
+      setSent(true)
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : '문의 등록 중 오류가 발생했습니다')
+    } finally {
+      setLoading(false)
+    }
   }
 
   if (sent) {
@@ -225,6 +241,12 @@ export default function InquiryPage() {
             </div>
           )}
 
+          {error && (
+            <div className="px-5 py-2 text-sm" style={{ color: 'var(--color-error)' }}>
+              {error}
+            </div>
+          )}
+
           {/* 하단 액션 바 */}
           <div
             className="flex items-center justify-between px-5 py-3 border-t"
@@ -247,9 +269,9 @@ export default function InquiryPage() {
             </label>
 
             {/* 전송 */}
-            <Button type="submit" size="sm">
+            <Button type="submit" size="sm" disabled={loading}>
               <Send size={14} className="mr-1.5" />
-              보내기
+              {loading ? '전송 중...' : '보내기'}
             </Button>
           </div>
         </form>
