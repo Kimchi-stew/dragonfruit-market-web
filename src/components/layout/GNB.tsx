@@ -6,28 +6,28 @@ import { alarmApi, type AlarmItem } from '../../api/alarm'
 import { cartApi } from '../../api/cart'
 
 const NAV_ITEMS = [
-  { label: '전체', to: '/products' },
-  { label: '뷰티', to: '/products?category=beauty' },
-  { label: '패션', to: '/products?category=fashion' },
-  { label: '식품', to: '/products?category=food' },
-  { label: '가전', to: '/products?category=tool' },
-  { label: '상점', to: '/sellers' },
+  { label: '전체',  to: '/products' },
+  { label: '뷰티',  to: '/products?category=beauty' },
+  { label: '패션',  to: '/products?category=fashion' },
+  { label: '식품',  to: '/products?category=food' },
+  { label: '가전',  to: '/products?category=tool' },
+  { label: '상점',  to: '/sellers' },
 ]
 
 export default function GNB() {
   const [searchFocused, setSearchFocused] = useState(false)
-  const [searchValue, setSearchValue] = useState('')
-  const [mobileOpen, setMobileOpen] = useState(false)
-  const [bellOpen, setBellOpen] = useState(false)
-  const [alarms, setAlarms] = useState<AlarmItem[]>([])
-  const [unreadCount, setUnreadCount] = useState(0)
-  const [cartCount, setCartCount] = useState(0)
-  const bellRef = useRef<HTMLDivElement>(null)
-  const navigate = useNavigate()
-  const location = useLocation()
+  const [searchValue, setSearchValue]     = useState('')
+  const [mobileOpen, setMobileOpen]       = useState(false)
+  const [bellOpen, setBellOpen]           = useState(false)
+  const [alarms, setAlarms]               = useState<AlarmItem[]>([])
+  const [unreadCount, setUnreadCount]     = useState(0)
+  const [cartCount, setCartCount]         = useState(0)
+  const bellRef   = useRef<HTMLDivElement>(null)
+  const navigate  = useNavigate()
+  const location  = useLocation()
   const { user, logout } = useAuth()
 
-  const searchParams = new URLSearchParams(location.search)
+  const searchParams    = new URLSearchParams(location.search)
   const currentCategory = searchParams.get('category')
 
   useEffect(() => {
@@ -49,6 +49,55 @@ export default function GNB() {
     cartApi.get()
       .then((res) => setCartCount(res.data.totalQuantity ?? 0))
       .catch(() => setCartCount(0))
+  }, [user])
+
+  // 장바구니 변경 이벤트
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const delta = (e as CustomEvent<number>).detail ?? 0
+      setCartCount((c) => Math.max(0, c + delta))
+    }
+    window.addEventListener('cart-count-change', handler)
+    return () => window.removeEventListener('cart-count-change', handler)
+  }, [])
+
+  // SSE 실시간 알림
+  useEffect(() => {
+    if (!user) return
+    const token = localStorage.getItem('accessToken')
+    if (!token) return
+
+    const controller = new AbortController()
+
+    const connectSSE = async () => {
+      try {
+        const res = await fetch('/api/alarm/connect', {
+          headers: { Authorization: `Bearer ${token}` },
+          signal: controller.signal,
+        })
+        if (!res.ok || !res.body) return
+        const reader  = res.body.getReader()
+        const decoder = new TextDecoder()
+        let buffer = ''
+        while (true) {
+          const { done, value } = await reader.read()
+          if (done) break
+          buffer += decoder.decode(value, { stream: true })
+          const lines = buffer.split('\n')
+          buffer = lines.pop() ?? ''
+          for (const line of lines) {
+            if (line.startsWith('data:') && line.trim() !== 'data:') {
+              setUnreadCount((c) => c + 1)
+            }
+          }
+        }
+      } catch {
+        // 연결 종료 또는 abort
+      }
+    }
+
+    connectSSE()
+    return () => controller.abort()
   }, [user])
 
   // 벨 열릴 때 알림 목록 조회
@@ -218,7 +267,7 @@ export default function GNB() {
             )}
           </Link>
 
-          {/* 로그인 상태에 따른 버튼 */}
+          {/* 로그인 상태 */}
           {user ? (
             <div className="hidden sm:flex items-center gap-1.5">
               <Link
