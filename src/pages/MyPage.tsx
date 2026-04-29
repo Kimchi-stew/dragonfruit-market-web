@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Package, Heart, MessageSquare, HelpCircle,
-  Ticket, Settings, Camera, Store, Trash2,
+  Ticket, Settings, Camera, Store, Trash2, Plus, Pencil, Star,
 } from 'lucide-react'
 import ProductCard from '../components/product/ProductCard'
 import Input from '../components/ui/Input'
@@ -12,6 +12,11 @@ import { userApi, type UpdateProfileBody, type UpdatePasswordBody } from '../api
 import { sellersApi, type Seller, type CreateSellerBody } from '../api/sellers'
 import { ApiError } from '../api/client'
 import { useAuth } from '../contexts/AuthContext'
+import { ordersApi, type OrderSummary, ORDER_STATUS_LABEL } from '../api/orders'
+import { inquiriesApi, type InquirySummary } from '../api/inquiries'
+import { couponsApi, type UserCoupon } from '../api/coupons'
+import { productsApi, type ProductSummary, type CreateProductBody } from '../api/products'
+import { filesApi } from '../api/files'
 
 const SIDEBAR_MENU = [
   { icon: Package,       label: '주문 내역',    key: 'orders',   badge: null },
@@ -28,6 +33,41 @@ const ORDER_TABS = ['전체', '결제완료', '배송중', '배송완료', '취�
 // ── 주문 내역 ─────────────────────────────────────────────────
 function OrdersSection() {
   const [orderTab, setOrderTab] = useState('전체')
+  const [orders, setOrders] = useState<OrderSummary[]>([])
+  const [loading, setLoading] = useState(true)
+  const [cancelling, setCancelling] = useState<number | null>(null)
+
+  useEffect(() => {
+    ordersApi.getAll()
+      .then((res) => setOrders(res.data?.content ?? []))
+      .catch(() => setOrders([]))
+      .finally(() => setLoading(false))
+  }, [])
+
+  const handleCancel = async (orderId: number) => {
+    if (!confirm('주문을 취소하시겠습니까?')) return
+    setCancelling(orderId)
+    try {
+      await ordersApi.cancel(orderId)
+      setOrders((prev) => prev.map((o) =>
+        o.orderId === orderId ? { ...o, orderStatus: 'CANCELLED' as const } : o
+      ))
+    } catch { /* 무시 */ } finally {
+      setCancelling(null)
+    }
+  }
+
+  const TAB_STATUS: Record<string, string> = {
+    '결제완료': 'WAITING',
+    '배송중':   'SHIPPED',
+    '배송완료': 'DELIVERED',
+    '취소신청': 'CANCELLED',
+  }
+
+  const filtered = orderTab === '전체'
+    ? orders
+    : orders.filter((o) => o.orderStatus === TAB_STATUS[orderTab])
+
   return (
     <section>
       <h2 className="text-lg font-semibold mb-4">주문 내역</h2>
@@ -47,10 +87,70 @@ function OrdersSection() {
           </button>
         ))}
       </div>
-      <div className="flex flex-col items-center justify-center py-16 gap-2">
-        <Package size={36} style={{ color: 'var(--color-text-disabled)' }} />
-        <p className="text-sm" style={{ color: 'var(--color-text-disabled)' }}>주문 내역이 없습니다</p>
-      </div>
+      {loading ? (
+        <div className="flex justify-center py-10">
+          <div className="w-6 h-6 rounded-full border-2 border-t-transparent animate-spin"
+            style={{ borderColor: 'var(--color-primary)', borderTopColor: 'transparent' }} />
+        </div>
+      ) : filtered.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-16 gap-2">
+          <Package size={36} style={{ color: 'var(--color-text-disabled)' }} />
+          <p className="text-sm" style={{ color: 'var(--color-text-disabled)' }}>주문 내역이 없습니다</p>
+        </div>
+      ) : (
+        <div className="flex flex-col gap-4">
+          {filtered.map((order) => (
+            <div key={order.orderId} className="border rounded-[8px] p-4 flex flex-col gap-3"
+              style={{ borderColor: 'var(--color-border)' }}>
+              <div className="flex items-center justify-between">
+                <span className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>
+                  주문번호: {order.orderId} · {new Date(order.createdAt).toLocaleDateString('ko-KR')}
+                </span>
+                <span
+                  className="text-xs font-semibold px-2 py-0.5 rounded-full"
+                  style={{
+                    background: order.orderStatus === 'CANCELLED' ? 'rgba(244,67,54,0.08)' : 'rgba(76,175,80,0.08)',
+                    color: order.orderStatus === 'CANCELLED' ? 'var(--color-error)' : 'var(--color-success)',
+                  }}
+                >
+                  {ORDER_STATUS_LABEL[order.orderStatus] ?? order.orderStatus}
+                </span>
+              </div>
+              {order.items?.map((item, i) => (
+                <div key={i} className="flex items-center gap-2 text-sm">
+                  <div className="w-10 h-10 rounded-[6px] shrink-0 flex items-center justify-center"
+                    style={{ background: 'var(--color-border)' }}>
+                    <Package size={14} style={{ color: 'var(--color-text-disabled)' }} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate">{item.productName}</p>
+                    <p className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>
+                      {item.itemPrice.toLocaleString()}원 × {item.quantity}개
+                    </p>
+                  </div>
+                </div>
+              ))}
+              <div className="flex justify-between pt-2 border-t text-sm font-semibold"
+                style={{ borderColor: 'var(--color-border)' }}>
+                <span style={{ color: 'var(--color-text-secondary)' }}>총 결제금액</span>
+                <span>{order.totalPrice.toLocaleString()}원</span>
+              </div>
+              {(order.orderStatus === 'WAITING' || order.orderStatus === 'PAID') && (
+                <div className="flex justify-end">
+                  <button
+                    onClick={() => handleCancel(order.orderId)}
+                    disabled={cancelling === order.orderId}
+                    className="text-xs px-3 py-1.5 rounded-lg border transition-colors"
+                    style={{ borderColor: 'var(--color-error)', color: 'var(--color-error)' }}
+                  >
+                    {cancelling === order.orderId ? '취소 중...' : '주문 취소'}
+                  </button>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
     </section>
   )
 }
@@ -93,6 +193,11 @@ function WishlistSection() {
 function ReviewsSection() {
   const [reviews, setReviews] = useState<import('../api/reviews').ReviewDetail[]>([])
   const [loading, setLoading] = useState(true)
+  const [editingId, setEditingId] = useState<number | null>(null)
+  const [editRating, setEditRating] = useState(5)
+  const [editContent, setEditContent] = useState('')
+  const [editSaving, setEditSaving] = useState(false)
+  const [editHoverRating, setEditHoverRating] = useState(0)
 
   useEffect(() => {
     userApi.getMyReviews()
@@ -107,6 +212,26 @@ function ReviewsSection() {
       await reviewsApi.remove(reviewId)
       setReviews((prev) => prev.filter((r) => r.id !== reviewId))
     } catch { /* 무시 */ }
+  }
+
+  const handleStartEdit = (review: import('../api/reviews').ReviewDetail) => {
+    setEditingId(review.id)
+    setEditRating(review.rating)
+    setEditContent(review.content)
+    setEditHoverRating(0)
+  }
+
+  const handleSaveEdit = async () => {
+    if (!editingId) return
+    setEditSaving(true)
+    const { reviewsApi } = await import('../api/reviews')
+    try {
+      const res = await reviewsApi.update(editingId, { rating: editRating, content: editContent })
+      setReviews((prev) => prev.map((r) => r.id === editingId ? res.data : r))
+      setEditingId(null)
+    } catch { /* 무시 */ } finally {
+      setEditSaving(false)
+    }
   }
 
   return (
@@ -143,22 +268,72 @@ function ReviewsSection() {
                   </span>
                 </div>
 
-                <StarRating rating={review.rating} size="sm" showCount={false} />
-
-                {review.images?.length > 0 && (
-                  <div className="flex gap-2">
-                    {review.images.map((src, i) => (
-                      <img key={i} src={src} alt={`리뷰 사진 ${i + 1}`}
-                        className="w-16 h-16 rounded-[6px] object-cover" />
-                    ))}
+                {editingId === review.id ? (
+                  <div className="flex flex-col gap-3">
+                    <div className="flex items-center gap-1">
+                      {[1, 2, 3, 4, 5].map((n) => (
+                        <button
+                          key={n}
+                          type="button"
+                          onClick={() => setEditRating(n)}
+                          onMouseEnter={() => setEditHoverRating(n)}
+                          onMouseLeave={() => setEditHoverRating(0)}
+                        >
+                          <Star
+                            size={22}
+                            fill={(editHoverRating || editRating) >= n ? 'var(--color-star)' : 'none'}
+                            style={{ color: 'var(--color-star)' }}
+                          />
+                        </button>
+                      ))}
+                    </div>
+                    <textarea
+                      value={editContent}
+                      onChange={(e) => setEditContent(e.target.value)}
+                      rows={3}
+                      placeholder="리뷰 내용을 입력하세요"
+                      className="w-full px-3 py-2 text-sm border rounded-xl resize-none outline-none"
+                      style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-primary)' }}
+                    />
+                    <div className="flex gap-2 justify-end">
+                      <button
+                        onClick={() => setEditingId(null)}
+                        className="text-xs px-3 py-1.5 rounded-lg"
+                        style={{ color: 'var(--color-text-secondary)' }}
+                      >취소</button>
+                      <Button size="sm" onClick={handleSaveEdit} disabled={editSaving}>
+                        {editSaving ? '저장 중...' : '저장'}
+                      </Button>
+                    </div>
                   </div>
+                ) : (
+                  <>
+                    <StarRating rating={review.rating} size="sm" showCount={false} />
+                    {review.images?.length > 0 && (
+                      <div className="flex gap-2">
+                        {review.images.map((src, i) => (
+                          <img key={i} src={src} alt={`리뷰 사진 ${i + 1}`}
+                            className="w-16 h-16 rounded-[6px] object-cover" />
+                        ))}
+                      </div>
+                    )}
+                    <p className="text-sm leading-relaxed" style={{ color: 'var(--color-text-primary)' }}>
+                      {review.content}
+                    </p>
+                  </>
                 )}
 
-                <p className="text-sm leading-relaxed" style={{ color: 'var(--color-text-primary)' }}>
-                  {review.content}
-                </p>
-
-                <div className="flex items-center justify-end pt-2 border-t" style={{ borderColor: 'var(--color-border)' }}>
+                <div className="flex items-center justify-end gap-3 pt-2 border-t"
+                  style={{ borderColor: 'var(--color-border)' }}>
+                  {editingId !== review.id && (
+                    <button
+                      onClick={() => handleStartEdit(review)}
+                      className="flex items-center gap-1 text-xs"
+                      style={{ color: 'var(--color-text-secondary)' }}
+                    >
+                      <Pencil size={12} /> 수정
+                    </button>
+                  )}
                   <button onClick={() => handleDelete(review.id)}
                     className="text-xs" style={{ color: 'var(--color-error)' }}>
                     삭제
@@ -176,6 +351,15 @@ function ReviewsSection() {
 // ── 문의 ──────────────────────────────────────────────────────
 function InquirySection() {
   const navigate = useNavigate()
+  const [inquiries, setInquiries] = useState<InquirySummary[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    inquiriesApi.getMyInquiries()
+      .then((res) => setInquiries(res.data ?? []))
+      .catch(() => setInquiries([]))
+      .finally(() => setLoading(false))
+  }, [])
 
   return (
     <section>
@@ -183,10 +367,40 @@ function InquirySection() {
         <h2 className="text-lg font-semibold">문의</h2>
         <Button size="sm" variant="secondary" onClick={() => navigate('/inquiry')}>문의하기</Button>
       </div>
-      <div className="flex flex-col items-center justify-center py-16 gap-2">
-        <HelpCircle size={36} style={{ color: 'var(--color-text-disabled)' }} />
-        <p className="text-sm" style={{ color: 'var(--color-text-disabled)' }}>문의 내역이 없습니다</p>
-      </div>
+      {loading ? (
+        <div className="flex justify-center py-10">
+          <div className="w-6 h-6 rounded-full border-2 border-t-transparent animate-spin"
+            style={{ borderColor: 'var(--color-primary)', borderTopColor: 'transparent' }} />
+        </div>
+      ) : inquiries.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-16 gap-2">
+          <HelpCircle size={36} style={{ color: 'var(--color-text-disabled)' }} />
+          <p className="text-sm" style={{ color: 'var(--color-text-disabled)' }}>문의 내역이 없습니다</p>
+        </div>
+      ) : (
+        <div className="flex flex-col gap-3">
+          {inquiries.map((inq) => (
+            <div key={inq.inquiryId} className="border rounded-[8px] p-4"
+              style={{ borderColor: 'var(--color-border)' }}>
+              <div className="flex items-start justify-between gap-2">
+                <p className="text-sm font-medium flex-1 min-w-0 truncate">{inq.title}</p>
+                <span
+                  className="text-xs font-semibold px-2 py-0.5 rounded-full shrink-0"
+                  style={{
+                    background: inq.status === 'ANSWERED' ? 'rgba(76,175,80,0.08)' : 'rgba(255,152,0,0.08)',
+                    color: inq.status === 'ANSWERED' ? 'var(--color-success)' : '#F57C00',
+                  }}
+                >
+                  {inq.status === 'ANSWERED' ? '답변완료' : '답변대기'}
+                </span>
+              </div>
+              <p className="text-xs mt-1" style={{ color: 'var(--color-text-secondary)' }}>
+                {new Date(inq.createdAt).toLocaleDateString('ko-KR')}
+              </p>
+            </div>
+          ))}
+        </div>
+      )}
     </section>
   )
 }
@@ -194,6 +408,38 @@ function InquirySection() {
 // ── 쿠폰 관리 ─────────────────────────────────────────────────
 function CouponsSection() {
   const [tab, setTab] = useState<'available' | 'used'>('available')
+  const [coupons, setCoupons] = useState<UserCoupon[]>([])
+  const [loading, setLoading] = useState(true)
+  const [code, setCode] = useState('')
+  const [registering, setRegistering] = useState(false)
+  const [registerMsg, setRegisterMsg] = useState('')
+
+  useEffect(() => {
+    couponsApi.getMyCoupons()
+      .then((res) => setCoupons(res.data ?? []))
+      .catch(() => setCoupons([]))
+      .finally(() => setLoading(false))
+  }, [])
+
+  const handleRegister = async () => {
+    if (!code.trim()) return
+    setRegistering(true)
+    setRegisterMsg('')
+    try {
+      const res = await couponsApi.register(code.trim())
+      setCoupons((prev) => [...prev, res.data])
+      setCode('')
+      setRegisterMsg('쿠폰이 등록되었습니다!')
+    } catch (err) {
+      setRegisterMsg(err instanceof ApiError ? err.message : '쿠폰 등록 실패')
+    } finally {
+      setRegistering(false)
+    }
+  }
+
+  const available = coupons.filter((c) => !c.used)
+  const used = coupons.filter((c) => c.used)
+  const shown = tab === 'available' ? available : used
 
   return (
     <section>
@@ -201,8 +447,8 @@ function CouponsSection() {
 
       <div className="flex gap-4 border-b mb-5" style={{ borderColor: 'var(--color-border)' }}>
         {[
-          { key: 'available' as const, label: '사용 가능 (0)' },
-          { key: 'used' as const,      label: '사용 완료 (0)' },
+          { key: 'available' as const, label: `사용 가능 (${available.length})` },
+          { key: 'used' as const,      label: `사용 완료 (${used.length})` },
         ].map(({ key, label }) => (
           <button key={key} onClick={() => setTab(key)}
             className="pb-3 text-sm font-medium border-b-2 transition-colors"
@@ -218,18 +464,67 @@ function CouponsSection() {
       </div>
 
       {tab === 'available' && (
-        <div className="flex gap-2 mb-5">
-          <input type="text" placeholder="쿠폰 코드를 입력하세요"
-            className="flex-1 h-10 px-3 text-sm border-2 rounded-xl outline-none transition-all focus:border-[#FF3D87]"
-            style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-primary)' }} />
-          <Button size="sm">등록</Button>
+        <div className="flex flex-col gap-1.5 mb-5">
+          <div className="flex gap-2">
+            <input
+              type="text"
+              placeholder="쿠폰 코드를 입력하세요"
+              value={code}
+              onChange={(e) => setCode(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleRegister() } }}
+              className="flex-1 h-10 px-3 text-sm border-2 rounded-xl outline-none transition-all focus:border-[#FF3D87]"
+              style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-primary)' }}
+            />
+            <Button size="sm" onClick={handleRegister} disabled={registering}>
+              {registering ? '등록 중...' : '등록'}
+            </Button>
+          </div>
+          {registerMsg && (
+            <p className="text-xs" style={{
+              color: registerMsg.includes('실패') || registerMsg.includes('오류') ? 'var(--color-error)' : 'var(--color-success)'
+            }}>
+              {registerMsg}
+            </p>
+          )}
         </div>
       )}
 
-      <div className="flex flex-col items-center justify-center py-16 gap-2">
-        <Ticket size={36} style={{ color: 'var(--color-text-disabled)' }} />
-        <p className="text-sm" style={{ color: 'var(--color-text-disabled)' }}>쿠폰이 없습니다</p>
-      </div>
+      {loading ? (
+        <div className="flex justify-center py-10">
+          <div className="w-6 h-6 rounded-full border-2 border-t-transparent animate-spin"
+            style={{ borderColor: 'var(--color-primary)', borderTopColor: 'transparent' }} />
+        </div>
+      ) : shown.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-16 gap-2">
+          <Ticket size={36} style={{ color: 'var(--color-text-disabled)' }} />
+          <p className="text-sm" style={{ color: 'var(--color-text-disabled)' }}>쿠폰이 없습니다</p>
+        </div>
+      ) : (
+        <div className="flex flex-col gap-3">
+          {shown.map((c) => (
+            <div key={c.userCouponId}
+              className="flex items-center justify-between border rounded-[8px] px-4 py-3"
+              style={{ borderColor: 'var(--color-border)', opacity: c.used ? 0.5 : 1 }}>
+              <div>
+                <p className="text-sm font-semibold">
+                  {c.discountType === 'RATE' ? `${c.discountValue}% 할인` : `${c.discountValue.toLocaleString()}원 할인`}
+                </p>
+                <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-secondary)' }}>
+                  {c.minOrderPrice > 0 && `${c.minOrderPrice.toLocaleString()}원 이상 구매 시 · `}
+                  {new Date(c.expiresAt).toLocaleDateString('ko-KR')} 만료
+                </p>
+              </div>
+              <span className="text-xs font-medium px-2 py-0.5 rounded-full"
+                style={{
+                  background: c.used ? 'var(--color-border)' : 'rgba(124,58,237,0.08)',
+                  color: c.used ? 'var(--color-text-disabled)' : 'var(--color-primary)',
+                }}>
+                {c.used ? '사용완료' : '사용가능'}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
     </section>
   )
 }
@@ -239,6 +534,8 @@ function SettingsSection() {
   const { user, refreshUser } = useAuth()
 
   const [nickname, setNickname] = useState('')
+  const [profileImage, setProfileImage] = useState<string | null>(null)
+  const [photoUploading, setPhotoUploading] = useState(false)
   const [profileLoading, setProfileLoading] = useState(true)
   const [profileSaving, setProfileSaving] = useState(false)
   const [profileError, setProfileError] = useState('')
@@ -253,6 +550,8 @@ function SettingsSection() {
 
   const [notification, setNotification] = useState({ email: true, sms: false, push: true })
 
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
   const passwordStrength =
     newPassword.length === 0 ? 0
     : newPassword.length < 6 ? 1
@@ -261,14 +560,13 @@ function SettingsSection() {
   const strengthLabel = ['', '약함', '보통', '강함'][passwordStrength]
   const strengthColor = ['', 'var(--color-error)', 'var(--color-star)', 'var(--color-success)'][passwordStrength]
 
-  // 프로필 불러오기
   useEffect(() => {
     const fetchProfile = async () => {
       try {
         const res = await userApi.getProfile()
         setNickname(res.data.nickname)
+        setProfileImage(res.data.profileImage ?? null)
       } catch {
-        // 이미 AuthContext에 user가 있으면 그걸 사용
         if (user) setNickname(user.nickname)
       } finally {
         setProfileLoading(false)
@@ -276,6 +574,21 @@ function SettingsSection() {
     }
     fetchProfile()
   }, [user])
+
+  const handlePhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setPhotoUploading(true)
+    try {
+      const url = await filesApi.upload(file, 'PROFILE')
+      await userApi.updateProfile({ profileImage: url })
+      setProfileImage(url)
+      await refreshUser()
+    } catch { /* 무시 */ } finally {
+      setPhotoUploading(false)
+      if (fileInputRef.current) fileInputRef.current.value = ''
+    }
+  }
 
   const handleProfileSave = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -342,19 +655,39 @@ function SettingsSection() {
           {/* 아바타 */}
           <div className="flex items-center gap-4">
             <div className="relative">
-              <div
-                className="w-16 h-16 rounded-full flex items-center justify-center text-xl font-bold text-white"
-                style={{ background: 'var(--color-primary)' }}
-              >
-                {user?.nickname?.charAt(0).toUpperCase() ?? 'U'}
-              </div>
+              {profileImage ? (
+                <img
+                  src={profileImage}
+                  alt="프로필"
+                  className="w-16 h-16 rounded-full object-cover"
+                />
+              ) : (
+                <div
+                  className="w-16 h-16 rounded-full flex items-center justify-center text-xl font-bold text-white"
+                  style={{ background: 'var(--color-primary)' }}
+                >
+                  {user?.nickname?.charAt(0).toUpperCase() ?? 'U'}
+                </div>
+              )}
               <button
                 type="button"
+                disabled={photoUploading}
+                onClick={() => fileInputRef.current?.click()}
                 className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full flex items-center justify-center"
                 style={{ background: 'var(--color-text-primary)' }}
               >
-                <Camera size={12} color="#fff" />
+                {photoUploading
+                  ? <div className="w-3 h-3 rounded-full border border-t-transparent animate-spin border-white" />
+                  : <Camera size={12} color="#fff" />
+                }
               </button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handlePhotoChange}
+                className="hidden"
+              />
             </div>
             <div>
               <p className="text-sm font-medium">프로필 사진 변경</p>
@@ -522,11 +855,27 @@ function ShopSection() {
   const [saved, setSaved] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
 
-  // 폼 상태
   const [storeName, setStoreName] = useState('')
   const [description, setDescription] = useState('')
 
-  // 내 상점 조회: GET /users/sellers
+  // 상품 관리
+  const [shopTab, setShopTab] = useState<'info' | 'products'>('info')
+  const [myProducts, setMyProducts] = useState<ProductSummary[]>([])
+  const [productsLoading, setProductsLoading] = useState(false)
+  const [showProductForm, setShowProductForm] = useState(false)
+  const [editingProduct, setEditingProduct] = useState<ProductSummary | null>(null)
+  const [pName, setPName] = useState('')
+  const [pPrice, setPPrice] = useState('')
+  const [pDesc, setPDesc] = useState('')
+  const [pStock, setPStock] = useState('')
+  const [pCategory, setPCategory] = useState('BEAUTY')
+  const [pImages, setPImages] = useState<string[]>([])
+  const [pImageUploading, setPImageUploading] = useState(false)
+  const [pSaving, setPSaving] = useState(false)
+  const [pDeleting, setPDeleting] = useState<number | null>(null)
+  const [pError, setPError] = useState('')
+  const productFileRef = useRef<HTMLInputElement>(null)
+
   useEffect(() => {
     if (!user) { setLoading(false); return }
     userApi.getMySeller()
@@ -538,6 +887,15 @@ function ShopSection() {
       .catch(() => { /* 상점 없음 */ })
       .finally(() => setLoading(false))
   }, [user])
+
+  useEffect(() => {
+    if (shopTab !== 'products' || !shop) return
+    setProductsLoading(true)
+    userApi.getMyProducts()
+      .then((res) => setMyProducts(res.data ?? []))
+      .catch(() => setMyProducts([]))
+      .finally(() => setProductsLoading(false))
+  }, [shopTab, shop])
 
   const handleCreate = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -589,6 +947,85 @@ function ShopSection() {
     }
   }
 
+  const openAddForm = () => {
+    setEditingProduct(null)
+    setPName(''); setPPrice(''); setPDesc(''); setPStock('')
+    setPCategory('BEAUTY'); setPImages([]); setPError('')
+    setShowProductForm(true)
+  }
+
+  const openEditForm = async (product: ProductSummary) => {
+    setEditingProduct(product)
+    setPName(product.name)
+    setPPrice(String(product.price))
+    setPDesc('')
+    setPStock('')
+    setPCategory('BEAUTY')
+    setPImages(product.image ? [product.image] : [])
+    setPError('')
+    setShowProductForm(true)
+    try {
+      const res = await productsApi.getOne(product.id)
+      const d = res.data
+      setPDesc(d.description)
+      setPStock(String(d.stock))
+      setPCategory(d.category)
+      setPImages(d.images ?? [])
+    } catch { /* 기본값 유지 */ }
+  }
+
+  const handleProductImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setPImageUploading(true)
+    try {
+      const url = await filesApi.upload(file, 'PRODUCT')
+      setPImages((prev) => [...prev, url])
+    } catch { /* 무시 */ } finally {
+      setPImageUploading(false)
+      if (productFileRef.current) productFileRef.current.value = ''
+    }
+  }
+
+  const handleProductSave = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault()
+    setPError('')
+    setPSaving(true)
+    try {
+      const body: CreateProductBody = {
+        name: pName,
+        price: Number(pPrice),
+        description: pDesc,
+        stock: Number(pStock),
+        images: pImages,
+        category: pCategory,
+      }
+      if (editingProduct) {
+        await productsApi.update(editingProduct.id, body)
+      } else {
+        await productsApi.create(body)
+      }
+      setShowProductForm(false)
+      const res = await userApi.getMyProducts()
+      setMyProducts(res.data ?? [])
+    } catch (err) {
+      setPError(err instanceof ApiError ? err.message : '저장 중 오류가 발생했습니다')
+    } finally {
+      setPSaving(false)
+    }
+  }
+
+  const handleProductDelete = async (productId: number) => {
+    if (!confirm('상품을 삭제하시겠습니까?')) return
+    setPDeleting(productId)
+    try {
+      await productsApi.remove(productId)
+      setMyProducts((prev) => prev.filter((p) => p.id !== productId))
+    } catch { /* 무시 */ } finally {
+      setPDeleting(null)
+    }
+  }
+
   if (loading) {
     return (
       <section>
@@ -606,7 +1043,6 @@ function ShopSection() {
       <h2 className="text-lg font-semibold mb-6">내 상점</h2>
 
       {shop ? (
-        // 상점이 있는 경우 - 수정 폼
         <div className="flex flex-col gap-6">
           {/* 상점 미리보기 링크 */}
           <div
@@ -634,73 +1070,252 @@ function ShopSection() {
             </button>
           </div>
 
-          <form onSubmit={handleUpdate} className="flex flex-col gap-4">
-            <Input
-              label="상점 이름"
-              placeholder="상점 이름 입력"
-              value={storeName}
-              onChange={(e) => setStoreName(e.target.value)}
-              required
-            />
-            <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-medium" style={{ color: 'var(--color-text-secondary)' }}>상점 소개</label>
-              <textarea
-                placeholder="상점 소개를 입력하세요"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                rows={4}
-                className="w-full px-4 py-3 rounded-xl border text-sm resize-none outline-none transition-colors"
-                style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-primary)' }}
-              />
-            </div>
-
-            {error && <p className="text-sm" style={{ color: 'var(--color-error)' }}>{error}</p>}
-
-            <div className="flex items-center gap-3">
-              <Button type="submit" disabled={saving}>
-                {saving ? '저장 중...' : '상점 정보 저장'}
-              </Button>
-              {saved && <p className="text-sm" style={{ color: 'var(--color-success)' }}>저장되었습니다!</p>}
-            </div>
-          </form>
-
-          {/* 삭제 */}
-          <div className="pt-2">
-            {confirmDelete ? (
-              <div
-                className="flex items-center gap-3 p-4 rounded-xl border"
-                style={{ borderColor: 'var(--color-error)', background: 'rgba(244,67,54,0.04)' }}
+          {/* 탭 */}
+          <div className="flex gap-4 border-b" style={{ borderColor: 'var(--color-border)' }}>
+            {[
+              { key: 'info' as const,     label: '상점 정보' },
+              { key: 'products' as const, label: '상품 관리' },
+            ].map(({ key, label }) => (
+              <button key={key} onClick={() => setShopTab(key)}
+                className="pb-3 text-sm font-medium border-b-2 transition-colors"
+                style={
+                  shopTab === key
+                    ? { borderColor: 'var(--color-primary)', color: 'var(--color-primary)' }
+                    : { borderColor: 'transparent', color: 'var(--color-text-secondary)' }
+                }
               >
-                <p className="flex-1 text-sm" style={{ color: 'var(--color-error)' }}>
-                  정말 상점을 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.
-                </p>
-                <button
-                  onClick={handleDelete}
-                  disabled={deleting}
-                  className="text-sm font-semibold px-3 py-1.5 rounded-lg"
-                  style={{ background: 'var(--color-error)', color: '#fff' }}
-                >
-                  {deleting ? '삭제 중...' : '삭제'}
-                </button>
-                <button
-                  onClick={() => setConfirmDelete(false)}
-                  className="text-sm px-3 py-1.5 rounded-lg"
-                  style={{ color: 'var(--color-text-secondary)' }}
-                >
-                  취소
-                </button>
-              </div>
-            ) : (
-              <button
-                type="button"
-                onClick={() => setConfirmDelete(true)}
-                className="flex items-center gap-1.5 text-xs"
-                style={{ color: 'var(--color-text-disabled)' }}
-              >
-                <Trash2 size={13} /> 상점 삭제
+                {label}
               </button>
-            )}
+            ))}
           </div>
+
+          {shopTab === 'info' ? (
+            <>
+              <form onSubmit={handleUpdate} className="flex flex-col gap-4">
+                <Input
+                  label="상점 이름"
+                  placeholder="상점 이름 입력"
+                  value={storeName}
+                  onChange={(e) => setStoreName(e.target.value)}
+                  required
+                />
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-medium" style={{ color: 'var(--color-text-secondary)' }}>상점 소개</label>
+                  <textarea
+                    placeholder="상점 소개를 입력하세요"
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    rows={4}
+                    className="w-full px-4 py-3 rounded-xl border text-sm resize-none outline-none transition-colors"
+                    style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-primary)' }}
+                  />
+                </div>
+
+                {error && <p className="text-sm" style={{ color: 'var(--color-error)' }}>{error}</p>}
+
+                <div className="flex items-center gap-3">
+                  <Button type="submit" disabled={saving}>
+                    {saving ? '저장 중...' : '상점 정보 저장'}
+                  </Button>
+                  {saved && <p className="text-sm" style={{ color: 'var(--color-success)' }}>저장되었습니다!</p>}
+                </div>
+              </form>
+
+              <div className="pt-2">
+                {confirmDelete ? (
+                  <div
+                    className="flex items-center gap-3 p-4 rounded-xl border"
+                    style={{ borderColor: 'var(--color-error)', background: 'rgba(244,67,54,0.04)' }}
+                  >
+                    <p className="flex-1 text-sm" style={{ color: 'var(--color-error)' }}>
+                      정말 상점을 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.
+                    </p>
+                    <button
+                      onClick={handleDelete}
+                      disabled={deleting}
+                      className="text-sm font-semibold px-3 py-1.5 rounded-lg"
+                      style={{ background: 'var(--color-error)', color: '#fff' }}
+                    >
+                      {deleting ? '삭제 중...' : '삭제'}
+                    </button>
+                    <button
+                      onClick={() => setConfirmDelete(false)}
+                      className="text-sm px-3 py-1.5 rounded-lg"
+                      style={{ color: 'var(--color-text-secondary)' }}
+                    >
+                      취소
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setConfirmDelete(true)}
+                    className="flex items-center gap-1.5 text-xs"
+                    style={{ color: 'var(--color-text-disabled)' }}
+                  >
+                    <Trash2 size={13} /> 상점 삭제
+                  </button>
+                )}
+              </div>
+            </>
+          ) : (
+            // 상품 관리 탭
+            <div className="flex flex-col gap-4">
+              {!showProductForm && (
+                <div className="flex justify-end">
+                  <Button size="sm" onClick={openAddForm}>
+                    <Plus size={14} className="mr-1" /> 상품 추가
+                  </Button>
+                </div>
+              )}
+
+              {showProductForm && (
+                <div className="border rounded-[8px] p-4" style={{ borderColor: 'var(--color-border)' }}>
+                  <form onSubmit={handleProductSave} className="flex flex-col gap-4">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-sm font-semibold">{editingProduct ? '상품 수정' : '상품 추가'}</h3>
+                      <button type="button" onClick={() => setShowProductForm(false)}
+                        className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>
+                        취소
+                      </button>
+                    </div>
+
+                    <Input label="상품명" placeholder="상품명 입력" value={pName}
+                      onChange={(e) => setPName(e.target.value)} required />
+
+                    <div className="flex gap-3">
+                      <Input label="가격 (원)" type="number" placeholder="0" value={pPrice}
+                        onChange={(e) => setPPrice(e.target.value)} required />
+                      <Input label="재고" type="number" placeholder="0" value={pStock}
+                        onChange={(e) => setPStock(e.target.value)} required />
+                    </div>
+
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-xs font-medium" style={{ color: 'var(--color-text-secondary)' }}>카테고리</label>
+                      <div className="flex gap-2 flex-wrap">
+                        {[
+                          { value: 'BEAUTY',      label: '뷰티' },
+                          { value: 'FASHION',     label: '패션' },
+                          { value: 'FOOD',        label: '식품' },
+                          { value: 'ELECTRONICS', label: '가전' },
+                        ].map(({ value, label }) => (
+                          <button key={value} type="button" onClick={() => setPCategory(value)}
+                            className="px-3 py-1.5 text-xs rounded-full border transition-colors"
+                            style={pCategory === value
+                              ? { background: 'var(--color-primary)', color: '#fff', borderColor: 'var(--color-primary)' }
+                              : { color: 'var(--color-text-secondary)', borderColor: 'var(--color-border)' }
+                            }
+                          >{label}</button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-xs font-medium" style={{ color: 'var(--color-text-secondary)' }}>상품 설명</label>
+                      <textarea
+                        value={pDesc}
+                        onChange={(e) => setPDesc(e.target.value)}
+                        rows={3}
+                        placeholder="상품 설명을 입력하세요"
+                        className="w-full px-3 py-2 text-sm border rounded-xl resize-none outline-none"
+                        style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-primary)' }}
+                      />
+                    </div>
+
+                    <div className="flex flex-col gap-2">
+                      <label className="text-xs font-medium" style={{ color: 'var(--color-text-secondary)' }}>상품 이미지</label>
+                      <div className="flex gap-2 flex-wrap">
+                        {pImages.map((url, i) => (
+                          <div key={i} className="relative w-16 h-16">
+                            <img src={url} alt={`상품 이미지 ${i + 1}`}
+                              className="w-16 h-16 rounded-[6px] object-cover" />
+                            <button
+                              type="button"
+                              onClick={() => setPImages((prev) => prev.filter((_, idx) => idx !== i))}
+                              className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-white border flex items-center justify-center text-xs leading-none"
+                              style={{ borderColor: 'var(--color-border)', color: 'var(--color-error)' }}
+                            >×</button>
+                          </div>
+                        ))}
+                        <button
+                          type="button"
+                          onClick={() => productFileRef.current?.click()}
+                          disabled={pImageUploading}
+                          className="w-16 h-16 rounded-[6px] border-2 border-dashed flex items-center justify-center"
+                          style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-disabled)' }}
+                        >
+                          {pImageUploading
+                            ? <div className="w-4 h-4 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: 'var(--color-primary)', borderTopColor: 'transparent' }} />
+                            : <Plus size={16} />
+                          }
+                        </button>
+                      </div>
+                      <input ref={productFileRef} type="file" accept="image/*"
+                        onChange={handleProductImageUpload} className="hidden" />
+                    </div>
+
+                    {pError && <p className="text-sm" style={{ color: 'var(--color-error)' }}>{pError}</p>}
+
+                    <Button type="submit" disabled={pSaving}>
+                      {pSaving ? '저장 중...' : editingProduct ? '수정 저장' : '상품 등록'}
+                    </Button>
+                  </form>
+                </div>
+              )}
+
+              {productsLoading ? (
+                <div className="flex justify-center py-10">
+                  <div className="w-6 h-6 rounded-full border-2 border-t-transparent animate-spin"
+                    style={{ borderColor: 'var(--color-primary)', borderTopColor: 'transparent' }} />
+                </div>
+              ) : myProducts.length === 0 ? (
+                <div className="flex flex-col items-center gap-2 py-10">
+                  <Package size={36} style={{ color: 'var(--color-text-disabled)' }} />
+                  <p className="text-sm" style={{ color: 'var(--color-text-disabled)' }}>등록된 상품이 없습니다</p>
+                </div>
+              ) : (
+                <div className="flex flex-col gap-3">
+                  {myProducts.map((product) => (
+                    <div key={product.id} className="flex items-center gap-3 p-3 rounded-[8px] border"
+                      style={{ borderColor: 'var(--color-border)' }}>
+                      {product.image ? (
+                        <img src={product.image} alt={product.name}
+                          className="w-12 h-12 rounded-[6px] object-cover shrink-0" />
+                      ) : (
+                        <div className="w-12 h-12 rounded-[6px] shrink-0 flex items-center justify-center"
+                          style={{ background: 'var(--color-border)' }}>
+                          <Package size={16} style={{ color: 'var(--color-text-disabled)' }} />
+                        </div>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">{product.name}</p>
+                        <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-secondary)' }}>
+                          {product.price.toLocaleString()}원
+                        </p>
+                      </div>
+                      <div className="flex gap-2 shrink-0">
+                        <button
+                          onClick={() => openEditForm(product)}
+                          className="flex items-center gap-1 text-xs px-2 py-1.5 rounded-lg border transition-colors"
+                          style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)' }}
+                        >
+                          <Pencil size={11} /> 수정
+                        </button>
+                        <button
+                          onClick={() => handleProductDelete(product.id)}
+                          disabled={pDeleting === product.id}
+                          className="flex items-center gap-1 text-xs px-2 py-1.5 rounded-lg border transition-colors"
+                          style={{ borderColor: 'var(--color-error)', color: 'var(--color-error)' }}
+                        >
+                          <Trash2 size={11} /> {pDeleting === product.id ? '...' : '삭제'}
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       ) : (
         // 상점이 없는 경우 - 개설 폼
