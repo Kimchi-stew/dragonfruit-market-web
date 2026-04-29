@@ -25,3 +25,4 @@ dist-ssr
 
 # Design specs
 DESIGN_SPEC*.md
+.claude/

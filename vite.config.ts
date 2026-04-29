@@ -7,8 +7,9 @@ export default defineConfig({
   server: {
     proxy: {
       '/api': {
-        target: 'http://43.201.188.128:8282',
+        target: 'https://alvin1105.cloud',
         changeOrigin: true,
+        secure: true,
       },
     },
   },
