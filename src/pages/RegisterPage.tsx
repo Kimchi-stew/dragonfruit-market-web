@@ -90,9 +90,9 @@ export default function RegisterPage() {
       return
     }
 
-    const genderMap: Record<string, 'M' | 'F' | null> = {
+    const genderMap: Record<string, 'M' | 'W' | null> = {
       '남성': 'M',
-      '여성': 'F',
+      '여성': 'W',
       '선택 안함': null,
     }
 

@@ -15,7 +15,7 @@ export interface SignupBody {
   email: string
   password: string
   nickname: string
-  gender: 'M' | 'F' | null
+  gender: 'M' | 'W' | null
   profileImage?: string
 }
 
@@ -23,7 +23,7 @@ export interface UserProfile {
   id: number
   email: string
   nickname: string
-  gender: 'M' | 'F' | null
+  gender: 'M' | 'W' | null
   profileImage: string | null
   createdAt: string
   updatedAt: string
