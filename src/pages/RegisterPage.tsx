@@ -1,8 +1,10 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { CheckCircle } from 'lucide-react'
 import Input from '../components/ui/Input'
 import Button from '../components/ui/Button'
 import { useAuth, ApiError } from '../contexts/AuthContext'
+import { authApi } from '../api/auth'
 
 export default function RegisterPage() {
   const [email, setEmail] = useState('')
@@ -14,6 +16,14 @@ export default function RegisterPage() {
   const [terms, setTerms] = useState({ service: false, privacy: false, marketing: false })
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+
+  // 이메일 인증
+  const [codeSent, setCodeSent] = useState(false)
+  const [code, setCode] = useState('')
+  const [emailVerified, setEmailVerified] = useState(false)
+  const [sendingCode, setSendingCode] = useState(false)
+  const [verifyingCode, setVerifyingCode] = useState(false)
+  const [emailMsg, setEmailMsg] = useState('')
 
   const { signup } = useAuth()
   const navigate = useNavigate()
@@ -33,10 +43,44 @@ export default function RegisterPage() {
     setTerms({ service: next, privacy: next, marketing: next })
   }
 
+  const handleSendCode = async () => {
+    if (!email) { setEmailMsg('이메일을 먼저 입력해주세요'); return }
+    setSendingCode(true)
+    setEmailMsg('')
+    try {
+      await authApi.sendEmail(email)
+      setCodeSent(true)
+      setEmailMsg('인증 코드가 발송되었습니다')
+    } catch (err) {
+      setEmailMsg(err instanceof ApiError ? err.message : '코드 발송 실패')
+    } finally {
+      setSendingCode(false)
+    }
+  }
+
+  const handleVerifyCode = async () => {
+    if (!code.trim()) return
+    setVerifyingCode(true)
+    setEmailMsg('')
+    try {
+      await authApi.verifyEmail(email, code.trim())
+      setEmailVerified(true)
+      setEmailMsg('이메일 인증이 완료되었습니다')
+    } catch (err) {
+      setEmailMsg(err instanceof ApiError ? err.message : '인증 실패. 코드를 확인해주세요')
+    } finally {
+      setVerifyingCode(false)
+    }
+  }
+
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     setError('')
 
+    if (!emailVerified) {
+      setError('이메일 인증을 완료해주세요')
+      return
+    }
     if (password !== confirmPw) {
       setError('비밀번호가 일치하지 않습니다')
       return
@@ -85,7 +129,6 @@ export default function RegisterPage() {
           </p>
         </div>
 
-        {/* 에러 메시지 */}
         {error && (
           <div
             className="px-4 py-3 rounded-xl text-sm text-center"
@@ -96,14 +139,81 @@ export default function RegisterPage() {
         )}
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-          <Input
-            label="이메일"
-            type="email"
-            placeholder="example@email.com"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-          />
+          {/* 이메일 + 인증 */}
+          <div className="flex flex-col gap-2">
+            <div className="flex gap-2">
+              <div className="flex-1">
+                <Input
+                  label="이메일"
+                  type="email"
+                  placeholder="example@email.com"
+                  value={email}
+                  onChange={(e) => {
+                    setEmail(e.target.value)
+                    setEmailVerified(false)
+                    setCodeSent(false)
+                    setCode('')
+                    setEmailMsg('')
+                  }}
+                  required
+                  readOnly={emailVerified}
+                  style={emailVerified ? { opacity: 0.7 } : undefined}
+                />
+              </div>
+              {!emailVerified && (
+                <div className="flex items-end pb-0">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="secondary"
+                    onClick={handleSendCode}
+                    disabled={sendingCode || !email}
+                    className="h-[46px] whitespace-nowrap"
+                  >
+                    {sendingCode ? '발송 중...' : codeSent ? '재발송' : '인증코드 발송'}
+                  </Button>
+                </div>
+              )}
+              {emailVerified && (
+                <div className="flex items-end pb-1">
+                  <CheckCircle size={20} style={{ color: 'var(--color-success)' }} />
+                </div>
+              )}
+            </div>
+
+            {codeSent && !emailVerified && (
+              <div className="flex gap-2">
+                <div className="flex-1">
+                  <Input
+                    label=""
+                    placeholder="인증 코드 6자리 입력"
+                    value={code}
+                    onChange={(e) => setCode(e.target.value)}
+                  />
+                </div>
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={handleVerifyCode}
+                  disabled={verifyingCode || !code.trim()}
+                  className="h-[46px] whitespace-nowrap"
+                >
+                  {verifyingCode ? '확인 중...' : '인증 확인'}
+                </Button>
+              </div>
+            )}
+
+            {emailMsg && (
+              <p className="text-xs" style={{
+                color: emailVerified ? 'var(--color-success)'
+                  : emailMsg.includes('실패') || emailMsg.includes('확인') ? 'var(--color-error)'
+                  : 'var(--color-text-secondary)'
+              }}>
+                {emailMsg}
+              </p>
+            )}
+          </div>
+
           <Input
             label="닉네임"
             placeholder="닉네임 입력"
@@ -112,7 +222,6 @@ export default function RegisterPage() {
             required
           />
 
-          {/* Password with strength */}
           <div className="flex flex-col gap-1.5">
             <Input
               label="비밀번호"
@@ -147,7 +256,7 @@ export default function RegisterPage() {
             required
           />
 
-          {/* Gender */}
+          {/* 성별 */}
           <div>
             <p className="text-xs mb-2" style={{ color: 'var(--color-text-secondary)' }}>성별</p>
             <div className="flex gap-2">
@@ -169,7 +278,7 @@ export default function RegisterPage() {
             </div>
           </div>
 
-          {/* Terms */}
+          {/* 약관 */}
           <div
             className="flex flex-col gap-2 p-4 rounded-[8px] border"
             style={{ borderColor: 'var(--color-border)' }}

@@ -53,6 +53,12 @@ export const authApi = {
 
   autoLogin: (refreshToken: string) =>
     api.post<ApiResponse<AuthTokens>>('/auth/auto-login', { refreshToken }),
+
+  sendEmail: (email: string) =>
+    api.post<ApiResponse<Record<string, never>>>('/auth/send-email', { email }),
+
+  verifyEmail: (email: string, code: string) =>
+    api.post<ApiResponse<Record<string, never>>>('/auth/verify-email', { email, code }),
 }
 
 import type { ProductSummary } from './products'
