@@ -3,6 +3,8 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { Store, Users, Heart, ArrowLeft, Package } from 'lucide-react'
 import { sellersApi, type Seller } from '../api/sellers'
 import { ApiError } from '../api/client'
+import type { ProductSummary } from '../api/products'
+import ProductCard from '../components/product/ProductCard'
 
 export default function SellerDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -13,9 +15,12 @@ export default function SellerDetailPage() {
   const [followLoading, setFollowLoading] = useState(false)
   const [likeLoading, setLikeLoading] = useState(false)
 
+  const [products, setProducts] = useState<ProductSummary[]>([])
+  const [productsLoading, setProductsLoading] = useState(true)
+
   useEffect(() => {
     if (!id) return
-    const fetch = async () => {
+    const fetchSeller = async () => {
       try {
         const res = await sellersApi.getOne(Number(id))
         setSeller(res.data)
@@ -25,7 +30,18 @@ export default function SellerDetailPage() {
         setLoading(false)
       }
     }
-    fetch()
+    const fetchProducts = async () => {
+      try {
+        const res = await sellersApi.getProducts(Number(id))
+        setProducts(res.data)
+      } catch {
+        setProducts([])
+      } finally {
+        setProductsLoading(false)
+      }
+    }
+    fetchSeller()
+    fetchProducts()
   }, [id])
 
   if (loading) {
@@ -150,18 +166,31 @@ export default function SellerDetailPage() {
         </div>
       </div>
 
-      {/* 상품 영역 (추후 연동) */}
+      {/* 판매 상품 */}
       <div>
         <h2 className="text-base font-semibold mb-4" style={{ color: 'var(--color-text-primary)' }}>
           판매 상품
         </h2>
-        <div
-          className="flex flex-col items-center justify-center py-16 rounded-2xl border gap-3"
-          style={{ borderColor: 'var(--color-border)' }}
-        >
-          <Package size={36} style={{ color: 'var(--color-text-disabled)' }} />
-          <p className="text-sm" style={{ color: 'var(--color-text-disabled)' }}>등록된 상품이 없습니다</p>
-        </div>
+        {productsLoading ? (
+          <div className="flex justify-center py-16">
+            <div className="w-6 h-6 rounded-full border-2 border-t-transparent animate-spin"
+              style={{ borderColor: 'var(--color-primary)', borderTopColor: 'transparent' }} />
+          </div>
+        ) : products.length === 0 ? (
+          <div
+            className="flex flex-col items-center justify-center py-16 rounded-2xl border gap-3"
+            style={{ borderColor: 'var(--color-border)' }}
+          >
+            <Package size={36} style={{ color: 'var(--color-text-disabled)' }} />
+            <p className="text-sm" style={{ color: 'var(--color-text-disabled)' }}>등록된 상품이 없습니다</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+            {products.map((p) => (
+              <ProductCard key={p.id} product={p} />
+            ))}
+          </div>
+        )}
       </div>
     </div>
   )

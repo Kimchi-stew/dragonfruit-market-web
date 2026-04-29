@@ -59,4 +59,7 @@ export const sellersApi = {
 
   follow: (id: number) =>
     api.post<ApiResponse<{ followed: boolean }>>(`/sellers/follow/${id}`),
+
+  getProducts: (id: number) =>
+    api.get<ApiResponse<import('./products').ProductSummary[]>>(`/sellers/${id}/products`),
 }
