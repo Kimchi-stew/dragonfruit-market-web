@@ -115,12 +115,26 @@ export default function HomePage() {
     productsApi.getAll({ size: 4, sortType: 'RECENT' })
       .then((res) => setNewProducts(res.data.content ?? []))
       .catch(() => {})
-    productsApi.getAll({ size: 8, sortType: 'POPULAR' })
+    productsApi.getRecommend()
       .then((res) => {
-        const all = res.data.content ?? []
-        setRecProducts(all.slice(4, 8).length > 0 ? all.slice(4, 8) : all.slice(0, 4))
+        const mapped: ProductSummary[] = (res.data ?? []).map((r) => ({
+          id: r.productId,
+          name: r.name,
+          price: r.price,
+          image: r.thumbnailUrl,
+          likeCount: 0,
+          seller: { id: 0, storeName: '', image: '' },
+        }))
+        setRecProducts(mapped.slice(0, 4))
       })
-      .catch(() => {})
+      .catch(() => {
+        productsApi.getAll({ size: 8, sortType: 'POPULAR' })
+          .then((res) => {
+            const all = res.data.content ?? []
+            setRecProducts(all.slice(4, 8).length > 0 ? all.slice(4, 8) : all.slice(0, 4))
+          })
+          .catch(() => {})
+      })
   }, [])
 
   const goTo = useCallback((idx: number) => {

@@ -100,6 +100,9 @@ export const productsApi = {
 
   getCategories: () =>
     api.get<ApiResponse<{ id: number; name: string; createdAt: string }[]>>('/products/category'),
+
+  getRecommend: () =>
+    api.get<ApiResponse<{ productId: number; name: string; price: number; thumbnailUrl: string; score: number }[]>>('/products/recommend'),
 }
 
 // 프론트엔드 카테고리 키 → API 값
