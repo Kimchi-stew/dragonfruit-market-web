@@ -3,17 +3,21 @@ import { Routes, Route } from 'react-router-dom'
 import GNB from './components/layout/GNB'
 import Footer from './components/layout/Footer'
 
-const HomePage          = lazy(() => import('./pages/HomePage'))
-const ProductListPage   = lazy(() => import('./pages/ProductListPage'))
-const ProductDetailPage = lazy(() => import('./pages/ProductDetailPage'))
-const CartPage          = lazy(() => import('./pages/CartPage'))
-const CheckoutPage      = lazy(() => import('./pages/CheckoutPage'))
-const LoginPage         = lazy(() => import('./pages/LoginPage'))
-const RegisterPage      = lazy(() => import('./pages/RegisterPage'))
-const MyPage            = lazy(() => import('./pages/MyPage'))
-const InquiryPage       = lazy(() => import('./pages/InquiryPage'))
-const SellerListPage    = lazy(() => import('./pages/SellerListPage'))
-const SellerDetailPage  = lazy(() => import('./pages/SellerDetailPage'))
+const HomePage             = lazy(() => import('./pages/HomePage'))
+const ProductListPage      = lazy(() => import('./pages/ProductListPage'))
+const ProductDetailPage    = lazy(() => import('./pages/ProductDetailPage'))
+const CartPage             = lazy(() => import('./pages/CartPage'))
+const CheckoutPage         = lazy(() => import('./pages/CheckoutPage'))
+const LoginPage            = lazy(() => import('./pages/LoginPage'))
+const RegisterPage         = lazy(() => import('./pages/RegisterPage'))
+const MyPage               = lazy(() => import('./pages/MyPage'))
+const InquiryPage          = lazy(() => import('./pages/InquiryPage'))
+const SellerListPage       = lazy(() => import('./pages/SellerListPage'))
+const SellerDetailPage     = lazy(() => import('./pages/SellerDetailPage'))
+const OAuthCallbackPage    = lazy(() => import('./pages/OAuthCallbackPage'))
+const SocialSignupPage     = lazy(() => import('./pages/SocialSignupPage'))
+const PaymentSuccessPage   = lazy(() => import('./pages/PaymentSuccessPage'))
+const PaymentFailPage      = lazy(() => import('./pages/PaymentFailPage'))
 
 function PageLoader() {
   return (
@@ -42,8 +46,12 @@ function App() {
             <Route path="/register"       element={<RegisterPage />} />
             <Route path="/mypage"         element={<MyPage />} />
             <Route path="/inquiry"        element={<InquiryPage />} />
-            <Route path="/sellers"        element={<SellerListPage />} />
-            <Route path="/sellers/:id"    element={<SellerDetailPage />} />
+            <Route path="/sellers"          element={<SellerListPage />} />
+            <Route path="/sellers/:id"      element={<SellerDetailPage />} />
+            <Route path="/oauth/callback"   element={<OAuthCallbackPage />} />
+            <Route path="/social-signup"    element={<SocialSignupPage />} />
+            <Route path="/payment/success"  element={<PaymentSuccessPage />} />
+            <Route path="/payment/fail"     element={<PaymentFailPage />} />
           </Routes>
         </Suspense>
       </main>

@@ -1,16 +1,18 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { CheckCircle, Ticket } from 'lucide-react'
+import { Ticket } from 'lucide-react'
 import Input from '../components/ui/Input'
 import Button from '../components/ui/Button'
 import type { CartItem } from '../api/cart'
-import { ordersApi, type CreateOrderResponse } from '../api/orders'
+import { ordersApi } from '../api/orders'
 import { couponsApi, type UserCoupon } from '../api/coupons'
+import { paymentsApi } from '../api/payments'
 import { ApiError } from '../api/client'
 import { useAuth } from '../contexts/AuthContext'
+import { loadTossPayments } from '@tosspayments/tosspayments-js'
 
-const STEPS = ['장바구니 확인', '주문 정보 입력', '주문 완료']
-const PAYMENT_METHODS = ['신용카드', '가상계좌', '포스페이', '무통장입금']
+const STEPS = ['장바구니 확인', '주문 정보 입력', '결제']
+const TOSS_CLIENT_KEY = import.meta.env.VITE_TOSS_CLIENT_KEY as string
 
 interface CheckoutItem extends CartItem {
   checked?: boolean
@@ -22,11 +24,10 @@ export default function CheckoutPage() {
   const { user }  = useAuth()
   const items: CheckoutItem[] = (location.state as { items: CheckoutItem[] } | null)?.items ?? []
 
-  const [payMethod, setPayMethod] = useState('신용카드')
+  const [payMethod, setPayMethod] = useState('카드')
   const [agreed, setAgreed]       = useState(false)
   const [loading, setLoading]     = useState(false)
   const [error, setError]         = useState('')
-  const [orderResult, setOrderResult] = useState<CreateOrderResponse | null>(null)
 
   const [recipient, setRecipient]         = useState('')
   const [phone, setPhone]                 = useState('')
@@ -68,44 +69,39 @@ export default function CheckoutPage() {
       const fullAddress = [recipient, phone, address, addressDetail, memo]
         .filter(Boolean)
         .join(' / ')
-      const res = await ordersApi.create({
+      const orderRes = await ordersApi.create({
         address: fullAddress,
         orderItems: items.map((i) => ({ productId: i.productId, quantity: i.quantity })),
         ...(selectedCoupon ? { couponId: selectedCoupon.userCouponId } : {}),
       })
-      setOrderResult(res.data)
+
+      const readyRes = await paymentsApi.ready(orderRes.data.orderId)
+      const { tossOrderId, orderName, amount } = readyRes.data
+
+      const tossPayments = await loadTossPayments(TOSS_CLIENT_KEY)
+      const payment = tossPayments.payment({
+        customerKey: user?.id ? String(user.id) : 'ANONYMOUS',
+      })
+      await payment.requestPayment({
+        method: payMethod === '카드' ? 'CARD'
+          : payMethod === '가상계좌' ? 'VIRTUAL_ACCOUNT'
+          : payMethod === '계좌이체' ? 'TRANSFER'
+          : 'CARD',
+        amount: { currency: 'KRW', value: amount },
+        orderId: tossOrderId,
+        orderName,
+        successUrl: `${window.location.origin}/payment/success`,
+        failUrl: `${window.location.origin}/payment/fail`,
+      })
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : '주문 처리 중 오류가 발생했습니다')
+      if (err instanceof ApiError) {
+        setError(err.message)
+      } else if (err instanceof Error && err.message !== 'PAY_PROCESS_CANCELED') {
+        setError('결제 처리 중 오류가 발생했습니다')
+      }
     } finally {
       setLoading(false)
     }
-  }
-
-  if (orderResult) {
-    return (
-      <div className="max-w-[500px] mx-auto px-6 py-20 flex flex-col items-center gap-6 text-center">
-        <div
-          className="w-20 h-20 rounded-full flex items-center justify-center"
-          style={{ background: 'rgba(76,175,80,0.1)' }}
-        >
-          <CheckCircle size={40} style={{ color: 'var(--color-success)' }} />
-        </div>
-        <div>
-          <h2 className="text-xl font-bold mb-2">주문이 완료되었습니다!</h2>
-          <p className="text-sm leading-relaxed" style={{ color: 'var(--color-text-secondary)' }}>
-            주문 번호: <strong>{orderResult.orderId}</strong><br />
-            결제 금액: <strong>{orderResult.totalPrice.toLocaleString()}원</strong>
-            {orderResult.discountAmount > 0 && (
-              <> (할인 {orderResult.discountAmount.toLocaleString()}원 적용)</>
-            )}
-          </p>
-        </div>
-        <div className="flex gap-3">
-          <Button variant="ghost" onClick={() => navigate('/mypage')}>주문 내역 보기</Button>
-          <Button onClick={() => navigate('/')}>홈으로</Button>
-        </div>
-      </div>
-    )
   }
 
   return (
@@ -245,8 +241,8 @@ export default function CheckoutPage() {
             {/* 결제 수단 */}
             <section>
               <h2 className="text-base font-semibold mb-4">결제 수단</h2>
-              <div className="flex gap-2 mb-4">
-                {PAYMENT_METHODS.map((m) => (
+              <div className="flex gap-2">
+                {['카드', '가상계좌', '계좌이체'].map((m) => (
                   <button key={m} type="button" onClick={() => setPayMethod(m)}
                     className="px-4 py-2 text-sm font-medium rounded-[8px] border transition-colors"
                     style={m === payMethod
@@ -256,15 +252,9 @@ export default function CheckoutPage() {
                   </button>
                 ))}
               </div>
-              {payMethod === '신용카드' && (
-                <div className="flex flex-col gap-4">
-                  <Input label="카드 번호" placeholder="1234-5678-9012-3456" />
-                  <div className="flex gap-4">
-                    <Input label="유효기간" placeholder="MM/YY" />
-                    <Input label="CVC" placeholder="123" />
-                  </div>
-                </div>
-              )}
+              <p className="text-xs mt-3" style={{ color: 'var(--color-text-secondary)' }}>
+                결제 버튼 클릭 시 토스페이먼츠 결제창이 열립니다
+              </p>
             </section>
 
             <label className="flex items-center gap-2 text-sm cursor-pointer">
