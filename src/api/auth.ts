@@ -32,8 +32,13 @@ export interface UserProfile {
 export interface UpdateProfileBody {
   email?: string
   nickname?: string
-  gender?: 'M' | 'F' | null
+  gender?: 'M' | 'W' | null
   profileImage?: string | null
+}
+
+export interface SocialSignupBody {
+  nickname: string
+  gender: 'M' | 'W' | null
 }
 
 export interface UpdatePasswordBody {
@@ -95,4 +100,7 @@ export const userApi = {
 
   getFollowedSellers: () =>
     api.get<ApiResponse<SellerSummary[]>>('/users/follow/sellers'),
+
+  socialSignup: (body: SocialSignupBody) =>
+    api.post<ApiResponse<Record<string, never>>>('/users/social-signup', body),
 }

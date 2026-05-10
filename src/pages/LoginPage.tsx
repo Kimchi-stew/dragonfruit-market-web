@@ -104,12 +104,16 @@ export default function LoginPage() {
         {/* Social login */}
         <div className="flex flex-col gap-3">
           <button
+            type="button"
+            onClick={() => { window.location.href = '/api/auth/oauth2/authorization/kakao' }}
             className="w-full h-12 rounded-full text-sm font-semibold transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md active:translate-y-0 active:scale-95"
             style={{ background: 'var(--color-kakao)', color: '#1A1A1A' }}
           >
             카카오로 로그인
           </button>
           <button
+            type="button"
+            onClick={() => { window.location.href = '/api/auth/oauth2/authorization/naver' }}
             className="w-full h-12 rounded-full text-sm font-semibold text-white transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md active:translate-y-0 active:scale-95"
             style={{ background: 'var(--color-naver)' }}
           >
