@@ -844,7 +844,7 @@ function SettingsSection() {
 
 // ── 내 상점 섹션 ──────────────────────────────────────────────
 function ShopSection() {
-  const { user } = useAuth()
+  const { user, refreshUser } = useAuth()
   const navigate = useNavigate()
 
   const [shop, setShop] = useState<Seller | null>(null)
@@ -857,6 +857,9 @@ function ShopSection() {
 
   const [storeName, setStoreName] = useState('')
   const [description, setDescription] = useState('')
+  const [shopImage, setShopImage] = useState<string | undefined>(undefined)
+  const [shopImageUploading, setShopImageUploading] = useState(false)
+  const shopImageRef = useRef<HTMLInputElement>(null)
 
   // 상품 관리
   const [shopTab, setShopTab] = useState<'info' | 'products'>('info')
@@ -883,6 +886,7 @@ function ShopSection() {
         setShop(res.data)
         setStoreName(res.data.storeName)
         setDescription(res.data.description)
+        setShopImage(res.data.image || undefined)
       })
       .catch(() => { /* 상점 없음 */ })
       .finally(() => setLoading(false))
@@ -897,14 +901,28 @@ function ShopSection() {
       .finally(() => setProductsLoading(false))
   }, [shopTab, shop])
 
+  const handleShopImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setShopImageUploading(true)
+    try {
+      const url = await filesApi.upload(file, 'PROFILE')
+      setShopImage(url)
+    } catch { /* 무시 */ } finally {
+      setShopImageUploading(false)
+      if (shopImageRef.current) shopImageRef.current.value = ''
+    }
+  }
+
   const handleCreate = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     setError('')
     setSaving(true)
     try {
-      const body: CreateSellerBody = { storeName, description }
+      const body: CreateSellerBody = { storeName, description, ...(shopImage ? { image: shopImage } : {}) }
       const res = await sellersApi.create(body)
       setShop(res.data)
+      await refreshUser()
       setSaved(true)
       setTimeout(() => setSaved(false), 2500)
     } catch (err) {
@@ -920,7 +938,7 @@ function ShopSection() {
     setError('')
     setSaving(true)
     try {
-      const res = await sellersApi.update(shop.id, { storeName, description })
+      const res = await sellersApi.update(shop.id, { storeName, description, ...(shopImage ? { image: shopImage } : {}) })
       setShop(res.data)
       setSaved(true)
       setTimeout(() => setSaved(false), 2500)
@@ -939,7 +957,9 @@ function ShopSection() {
       setShop(null)
       setStoreName('')
       setDescription('')
+      setShopImage(undefined)
       setConfirmDelete(false)
+      await refreshUser()
     } catch (err) {
       setError(err instanceof ApiError ? err.message : '상점 삭제 중 오류가 발생했습니다')
     } finally {
@@ -1049,11 +1069,12 @@ function ShopSection() {
             className="flex items-center gap-4 p-4 rounded-xl border"
             style={{ borderColor: 'var(--color-border)', background: '#FAFAFA' }}
           >
-            <div
-              className="w-12 h-12 rounded-full flex items-center justify-center shrink-0"
-              style={{ background: 'var(--color-primary)' }}
-            >
-              <Store size={20} color="#fff" />
+            <div className="w-12 h-12 rounded-full shrink-0 overflow-hidden flex items-center justify-center"
+              style={{ background: 'var(--color-primary)' }}>
+              {shop.image
+                ? <img src={shop.image} alt={shop.storeName} className="w-full h-full object-cover" />
+                : <Store size={20} color="#fff" />
+              }
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-semibold truncate">{shop.storeName}</p>
@@ -1092,6 +1113,37 @@ function ShopSection() {
           {shopTab === 'info' ? (
             <>
               <form onSubmit={handleUpdate} className="flex flex-col gap-4">
+                {/* 상점 이미지 */}
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-medium" style={{ color: 'var(--color-text-secondary)' }}>상점 이미지</label>
+                  <div className="flex items-center gap-3">
+                    <div className="relative w-16 h-16 rounded-full overflow-hidden shrink-0"
+                      style={{ background: 'var(--color-border)' }}>
+                      {shopImage
+                        ? <img src={shopImage} alt="상점" className="w-full h-full object-cover" />
+                        : <div className="w-full h-full flex items-center justify-center">
+                            <Store size={20} style={{ color: 'var(--color-text-disabled)' }} />
+                          </div>
+                      }
+                    </div>
+                    <button
+                      type="button"
+                      disabled={shopImageUploading}
+                      onClick={() => shopImageRef.current?.click()}
+                      className="text-xs px-3 py-1.5 rounded-lg border transition-colors"
+                      style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)' }}
+                    >
+                      {shopImageUploading ? '업로드 중...' : '이미지 변경'}
+                    </button>
+                    {shopImage && (
+                      <button type="button" onClick={() => setShopImage(undefined)}
+                        className="text-xs" style={{ color: 'var(--color-error)' }}>삭제</button>
+                    )}
+                    <input ref={shopImageRef} type="file" accept="image/*"
+                      onChange={handleShopImageUpload} className="hidden" />
+                  </div>
+                </div>
+
                 <Input
                   label="상점 이름"
                   placeholder="상점 이름 입력"
@@ -1334,6 +1386,37 @@ function ShopSection() {
           </div>
 
           <form onSubmit={handleCreate} className="flex flex-col gap-4">
+            {/* 상점 이미지 */}
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-medium" style={{ color: 'var(--color-text-secondary)' }}>상점 이미지 (선택)</label>
+              <div className="flex items-center gap-3">
+                <div className="relative w-16 h-16 rounded-full overflow-hidden shrink-0"
+                  style={{ background: 'var(--color-border)' }}>
+                  {shopImage
+                    ? <img src={shopImage} alt="상점" className="w-full h-full object-cover" />
+                    : <div className="w-full h-full flex items-center justify-center">
+                        <Store size={20} style={{ color: 'var(--color-text-disabled)' }} />
+                      </div>
+                  }
+                </div>
+                <button
+                  type="button"
+                  disabled={shopImageUploading}
+                  onClick={() => shopImageRef.current?.click()}
+                  className="text-xs px-3 py-1.5 rounded-lg border transition-colors"
+                  style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-secondary)' }}
+                >
+                  {shopImageUploading ? '업로드 중...' : '이미지 선택'}
+                </button>
+                {shopImage && (
+                  <button type="button" onClick={() => setShopImage(undefined)}
+                    className="text-xs" style={{ color: 'var(--color-error)' }}>삭제</button>
+                )}
+                <input ref={shopImageRef} type="file" accept="image/*"
+                  onChange={handleShopImageUpload} className="hidden" />
+              </div>
+            </div>
+
             <Input
               label="상점 이름"
               placeholder="상점 이름 입력"
@@ -1404,6 +1487,14 @@ export default function MyPage() {
               <p className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>
                 {user?.email ?? ''}
               </p>
+              {user?.role === 'SELLER' && (
+                <span
+                  className="inline-block mt-1 text-xs font-semibold px-2 py-0.5 rounded-full"
+                  style={{ background: 'rgba(124,58,237,0.1)', color: 'var(--color-primary)' }}
+                >
+                  판매자
+                </span>
+              )}
             </div>
             <button
               className="text-xs"

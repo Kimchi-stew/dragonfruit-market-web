@@ -25,6 +25,7 @@ export interface UserProfile {
   nickname: string
   gender: 'M' | 'W' | null
   profileImage: string | null
+  role: 'BUYER' | 'SELLER'
   createdAt: string
   updatedAt: string
 }
