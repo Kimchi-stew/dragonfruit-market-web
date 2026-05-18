@@ -2,30 +2,31 @@ import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Package, Heart, MessageSquare, HelpCircle,
-  Ticket, Settings, Camera, Store, Trash2, Plus, Pencil, Star,
+  Ticket, Settings, Camera, Store, Trash2, Plus, Pencil, Star, Users,
 } from 'lucide-react'
 import ProductCard from '../components/product/ProductCard'
 import Input from '../components/ui/Input'
 import Button from '../components/ui/Button'
 import StarRating from '../components/ui/StarRating'
 import { userApi, type UpdateProfileBody, type UpdatePasswordBody } from '../api/auth'
-import { sellersApi, type Seller, type CreateSellerBody } from '../api/sellers'
+import { sellersApi, type Seller, type SellerSummary, type CreateSellerBody } from '../api/sellers'
 import { ApiError } from '../api/client'
 import { useAuth } from '../contexts/AuthContext'
 import { ordersApi, type OrderSummary, ORDER_STATUS_LABEL } from '../api/orders'
-import { inquiriesApi, type InquirySummary } from '../api/inquiries'
+import { inquiriesApi, type InquirySummary, type CreateInquiryBody } from '../api/inquiries'
 import { couponsApi, type UserCoupon } from '../api/coupons'
 import { productsApi, type ProductSummary, type CreateProductBody } from '../api/products'
 import { filesApi } from '../api/files'
 
 const SIDEBAR_MENU = [
-  { icon: Package,       label: '주문 내역',    key: 'orders',   badge: null },
-  { icon: Heart,         label: '찜한 상품',    key: 'wishlist', badge: null },
-  { icon: MessageSquare, label: '내 리뷰',      key: 'reviews',  badge: null },
-  { icon: HelpCircle,    label: '문의',          key: 'inquiry',  badge: null },
-  { icon: Ticket,        label: '쿠폰 관리',     key: 'coupons',  badge: null },
-  { icon: Store,         label: '내 상점',       key: 'shop',     badge: null },
-  { icon: Settings,      label: '계정 설정',     key: 'settings', badge: null },
+  { icon: Package,       label: '주문 내역',    key: 'orders',        badge: null },
+  { icon: Heart,         label: '찜한 상품',    key: 'wishlist',      badge: null },
+  { icon: Users,         label: '관심 상점',    key: 'liked_sellers', badge: null },
+  { icon: MessageSquare, label: '내 리뷰',      key: 'reviews',       badge: null },
+  { icon: HelpCircle,    label: '문의',          key: 'inquiry',       badge: null },
+  { icon: Ticket,        label: '쿠폰 관리',     key: 'coupons',       badge: null },
+  { icon: Store,         label: '내 상점',       key: 'shop',          badge: null },
+  { icon: Settings,      label: '계정 설정',     key: 'settings',      badge: null },
 ]
 
 const ORDER_TABS = ['전체', '결제완료', '배송중', '배송완료', '취소신청']
@@ -155,28 +156,58 @@ function OrdersSection() {
   )
 }
 
-// ── 찜한 상품 ─────────────────────────────────────────────────
+// ── 찜한 상품 / 좋아요 상품 ───────────────────────────────────
 function WishlistSection() {
-  const [products, setProducts] = useState<{ id: number; name: string; price: number; image: string; seller?: { id: number; storeName: string; image: string } }[]>([])
-  const [loading, setLoading] = useState(true)
+  const [tab, setTab] = useState<'wish' | 'liked'>('wish')
+  const [wishProducts, setWishProducts]   = useState<ProductSummary[]>([])
+  const [likedProducts, setLikedProducts] = useState<ProductSummary[]>([])
+  const [wishLoading, setWishLoading]   = useState(true)
+  const [likedLoading, setLikedLoading] = useState(false)
+  const [likedFetched, setLikedFetched] = useState(false)
 
   useEffect(() => {
     userApi.getWishProducts()
-      .then((res) => setProducts(res.data))
-      .catch(() => setProducts([]))
-      .finally(() => setLoading(false))
+      .then((res) => setWishProducts(res.data ?? []))
+      .catch(() => setWishProducts([]))
+      .finally(() => setWishLoading(false))
   }, [])
+
+  useEffect(() => {
+    if (tab !== 'liked' || likedFetched) return
+    setLikedLoading(true)
+    userApi.getLikedProducts()
+      .then((res) => { setLikedProducts(res.data ?? []); setLikedFetched(true) })
+      .catch(() => setLikedProducts([]))
+      .finally(() => setLikedLoading(false))
+  }, [tab, likedFetched])
+
+  const loading  = tab === 'wish' ? wishLoading  : likedLoading
+  const products = tab === 'wish' ? wishProducts : likedProducts
+  const empty    = tab === 'wish' ? '찜한 상품이 없습니다' : '좋아요한 상품이 없습니다'
 
   return (
     <section>
-      <h2 className="text-lg font-semibold mb-4">찜한 상품</h2>
+      <div className="flex gap-4 border-b mb-5" style={{ borderColor: 'var(--color-border)' }}>
+        {[
+          { key: 'wish'  as const, label: '찜한 상품' },
+          { key: 'liked' as const, label: '좋아요 상품' },
+        ].map(({ key, label }) => (
+          <button key={key} onClick={() => setTab(key)}
+            className="pb-3 text-sm font-medium border-b-2 transition-colors"
+            style={tab === key
+              ? { borderColor: 'var(--color-primary)', color: 'var(--color-primary)' }
+              : { borderColor: 'transparent', color: 'var(--color-text-secondary)' }}>
+            {label}
+          </button>
+        ))}
+      </div>
       {loading ? (
         <div className="flex justify-center py-10">
           <div className="w-6 h-6 rounded-full border-2 border-t-transparent animate-spin"
             style={{ borderColor: 'var(--color-primary)', borderTopColor: 'transparent' }} />
         </div>
       ) : products.length === 0 ? (
-        <p className="text-sm py-10 text-center" style={{ color: 'var(--color-text-disabled)' }}>찜한 상품이 없습니다</p>
+        <p className="text-sm py-10 text-center" style={{ color: 'var(--color-text-disabled)' }}>{empty}</p>
       ) : (
         <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
           {products.map((p) => (
@@ -397,6 +428,92 @@ function InquirySection() {
               <p className="text-xs mt-1" style={{ color: 'var(--color-text-secondary)' }}>
                 {new Date(inq.createdAt).toLocaleDateString('ko-KR')}
               </p>
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
+  )
+}
+
+// ── 관심 상점 (좋아요 + 팔로우) ────────────────────────────────
+function LikedSellersSection() {
+  const navigate = useNavigate()
+  const [tab, setTab] = useState<'liked' | 'followed'>('liked')
+  const [likedSellers,    setLikedSellers]    = useState<SellerSummary[]>([])
+  const [followedSellers, setFollowedSellers] = useState<SellerSummary[]>([])
+  const [likedLoading,    setLikedLoading]    = useState(true)
+  const [followedLoading, setFollowedLoading] = useState(false)
+  const [followedFetched, setFollowedFetched] = useState(false)
+
+  useEffect(() => {
+    userApi.getLikedSellers()
+      .then((res) => setLikedSellers(res.data ?? []))
+      .catch(() => setLikedSellers([]))
+      .finally(() => setLikedLoading(false))
+  }, [])
+
+  useEffect(() => {
+    if (tab !== 'followed' || followedFetched) return
+    setFollowedLoading(true)
+    userApi.getFollowedSellers()
+      .then((res) => { setFollowedSellers(res.data ?? []); setFollowedFetched(true) })
+      .catch(() => setFollowedSellers([]))
+      .finally(() => setFollowedLoading(false))
+  }, [tab, followedFetched])
+
+  const loading = tab === 'liked' ? likedLoading : followedLoading
+  const sellers = tab === 'liked' ? likedSellers : followedSellers
+  const empty   = tab === 'liked' ? '좋아요한 상점이 없습니다' : '팔로우한 상점이 없습니다'
+
+  return (
+    <section>
+      <div className="flex gap-4 border-b mb-5" style={{ borderColor: 'var(--color-border)' }}>
+        {[
+          { key: 'liked'    as const, label: '좋아요 상점' },
+          { key: 'followed' as const, label: '팔로우 상점' },
+        ].map(({ key, label }) => (
+          <button key={key} onClick={() => setTab(key)}
+            className="pb-3 text-sm font-medium border-b-2 transition-colors"
+            style={tab === key
+              ? { borderColor: 'var(--color-primary)', color: 'var(--color-primary)' }
+              : { borderColor: 'transparent', color: 'var(--color-text-secondary)' }}>
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {loading ? (
+        <div className="flex justify-center py-10">
+          <div className="w-6 h-6 rounded-full border-2 border-t-transparent animate-spin"
+            style={{ borderColor: 'var(--color-primary)', borderTopColor: 'transparent' }} />
+        </div>
+      ) : sellers.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-16 gap-2">
+          <Users size={36} style={{ color: 'var(--color-text-disabled)' }} />
+          <p className="text-sm" style={{ color: 'var(--color-text-disabled)' }}>{empty}</p>
+        </div>
+      ) : (
+        <div className="flex flex-col gap-3">
+          {sellers.map((seller) => (
+            <div key={seller.id}
+              className="flex items-center gap-3 p-3 rounded-[8px] border cursor-pointer hover:bg-[#FAFAFA] transition-colors"
+              style={{ borderColor: 'var(--color-border)' }}
+              onClick={() => navigate(`/sellers/${seller.id}`)}
+            >
+              <div className="w-10 h-10 rounded-full overflow-hidden shrink-0 flex items-center justify-center"
+                style={{ background: 'var(--color-primary)' }}>
+                {seller.image
+                  ? <img src={seller.image} alt={seller.storeName} className="w-full h-full object-cover" />
+                  : <Store size={16} color="#fff" />
+                }
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium truncate">{seller.storeName}</p>
+                <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-secondary)' }}>
+                  팔로워 {seller.followCount} · 좋아요 {seller.likeCount}
+                </p>
+              </div>
             </div>
           ))}
         </div>
@@ -861,8 +978,8 @@ function ShopSection() {
   const [shopImageUploading, setShopImageUploading] = useState(false)
   const shopImageRef = useRef<HTMLInputElement>(null)
 
-  // 상품 관리
-  const [shopTab, setShopTab] = useState<'info' | 'products'>('info')
+  // 탭
+  const [shopTab, setShopTab] = useState<'info' | 'products' | 'inquiries' | 'orders'>('info')
   const [myProducts, setMyProducts] = useState<ProductSummary[]>([])
   const [productsLoading, setProductsLoading] = useState(false)
   const [showProductForm, setShowProductForm] = useState(false)
@@ -878,6 +995,20 @@ function ShopSection() {
   const [pDeleting, setPDeleting] = useState<number | null>(null)
   const [pError, setPError] = useState('')
   const productFileRef = useRef<HTMLInputElement>(null)
+
+  // 받은 문의
+  const [sellerInquiries, setSellerInquiries] = useState<InquirySummary[]>([])
+  const [inquiriesLoading, setInquiriesLoading] = useState(false)
+  const [inquiriesFetched, setInquiriesFetched] = useState(false)
+  const [answeringId, setAnsweringId] = useState<number | null>(null)
+  const [answerContent, setAnswerContent] = useState('')
+  const [answerSaving, setAnswerSaving] = useState(false)
+
+  // 주문 관리
+  const [sellerOrders, setSellerOrders] = useState<OrderSummary[]>([])
+  const [ordersLoading, setOrdersLoading] = useState(false)
+  const [ordersFetched, setOrdersFetched] = useState(false)
+  const [updatingOrderId, setUpdatingOrderId] = useState<number | null>(null)
 
   useEffect(() => {
     if (!user) { setLoading(false); return }
@@ -900,6 +1031,51 @@ function ShopSection() {
       .catch(() => setMyProducts([]))
       .finally(() => setProductsLoading(false))
   }, [shopTab, shop])
+
+  useEffect(() => {
+    if (shopTab !== 'inquiries' || !shop || inquiriesFetched) return
+    setInquiriesLoading(true)
+    inquiriesApi.getMyInquiries()
+      .then((res) => { setSellerInquiries(res.data ?? []); setInquiriesFetched(true) })
+      .catch(() => setSellerInquiries([]))
+      .finally(() => setInquiriesLoading(false))
+  }, [shopTab, shop, inquiriesFetched])
+
+  useEffect(() => {
+    if (shopTab !== 'orders' || !shop || ordersFetched) return
+    setOrdersLoading(true)
+    ordersApi.getAll()
+      .then((res) => { setSellerOrders(res.data?.content ?? []); setOrdersFetched(true) })
+      .catch(() => setSellerOrders([]))
+      .finally(() => setOrdersLoading(false))
+  }, [shopTab, shop, ordersFetched])
+
+  const handleAnswerInquiry = async (inquiryId: number) => {
+    if (!answerContent.trim()) return
+    setAnswerSaving(true)
+    try {
+      await inquiriesApi.answer(inquiryId, answerContent.trim())
+      setSellerInquiries((prev) => prev.map((i) =>
+        i.inquiryId === inquiryId ? { ...i, status: 'ANSWERED' as const, answerContent: answerContent.trim() } : i
+      ))
+      setAnsweringId(null)
+      setAnswerContent('')
+    } catch { /* 무시 */ } finally {
+      setAnswerSaving(false)
+    }
+  }
+
+  const handleUpdateOrderStatus = async (orderId: number, status: string) => {
+    setUpdatingOrderId(orderId)
+    try {
+      await ordersApi.updateStatus(orderId, status)
+      setSellerOrders((prev) => prev.map((o) =>
+        o.orderId === orderId ? { ...o, orderStatus: status as OrderSummary['orderStatus'] } : o
+      ))
+    } catch { /* 무시 */ } finally {
+      setUpdatingOrderId(null)
+    }
+  }
 
   const handleShopImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -1092,13 +1268,15 @@ function ShopSection() {
           </div>
 
           {/* 탭 */}
-          <div className="flex gap-4 border-b" style={{ borderColor: 'var(--color-border)' }}>
+          <div className="flex gap-4 border-b overflow-x-auto" style={{ borderColor: 'var(--color-border)' }}>
             {[
-              { key: 'info' as const,     label: '상점 정보' },
-              { key: 'products' as const, label: '상품 관리' },
+              { key: 'info'      as const, label: '상점 정보' },
+              { key: 'products'  as const, label: '상품 관리' },
+              { key: 'inquiries' as const, label: '받은 문의' },
+              { key: 'orders'    as const, label: '주문 관리' },
             ].map(({ key, label }) => (
               <button key={key} onClick={() => setShopTab(key)}
-                className="pb-3 text-sm font-medium border-b-2 transition-colors"
+                className="pb-3 text-sm font-medium border-b-2 transition-colors shrink-0"
                 style={
                   shopTab === key
                     ? { borderColor: 'var(--color-primary)', color: 'var(--color-primary)' }
@@ -1210,6 +1388,129 @@ function ShopSection() {
                 )}
               </div>
             </>
+          ) : shopTab === 'inquiries' ? (
+            // 받은 문의 탭
+            <div className="flex flex-col gap-3">
+              {inquiriesLoading ? (
+                <div className="flex justify-center py-10">
+                  <div className="w-6 h-6 rounded-full border-2 border-t-transparent animate-spin"
+                    style={{ borderColor: 'var(--color-primary)', borderTopColor: 'transparent' }} />
+                </div>
+              ) : sellerInquiries.length === 0 ? (
+                <div className="flex flex-col items-center gap-2 py-10">
+                  <HelpCircle size={36} style={{ color: 'var(--color-text-disabled)' }} />
+                  <p className="text-sm" style={{ color: 'var(--color-text-disabled)' }}>받은 문의가 없습니다</p>
+                </div>
+              ) : (
+                sellerInquiries.map((inq) => (
+                  <div key={inq.inquiryId} className="border rounded-[8px] p-4 flex flex-col gap-2"
+                    style={{ borderColor: 'var(--color-border)' }}>
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm font-medium">{inq.title}</p>
+                      <span className="text-xs font-semibold px-2 py-0.5 rounded-full"
+                        style={{
+                          background: inq.status === 'ANSWERED' ? 'rgba(76,175,80,0.08)' : 'rgba(255,152,0,0.08)',
+                          color: inq.status === 'ANSWERED' ? 'var(--color-success)' : '#F57C00',
+                        }}>
+                        {inq.status === 'ANSWERED' ? '답변완료' : '답변대기'}
+                      </span>
+                    </div>
+                    <p className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>{inq.content}</p>
+                    {inq.answerContent && (
+                      <div className="p-3 rounded-lg text-xs"
+                        style={{ background: 'var(--color-surface)', color: 'var(--color-text-secondary)' }}>
+                        <span className="font-semibold" style={{ color: 'var(--color-primary)' }}>답변: </span>
+                        {inq.answerContent}
+                      </div>
+                    )}
+                    {inq.status === 'PENDING' && (
+                      answeringId === inq.inquiryId ? (
+                        <div className="flex flex-col gap-2">
+                          <textarea
+                            value={answerContent}
+                            onChange={(e) => setAnswerContent(e.target.value)}
+                            rows={3}
+                            placeholder="답변 내용을 입력하세요"
+                            className="w-full px-3 py-2 text-sm border rounded-xl resize-none outline-none"
+                            style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-primary)' }}
+                          />
+                          <div className="flex gap-2 justify-end">
+                            <button onClick={() => { setAnsweringId(null); setAnswerContent('') }}
+                              className="text-xs px-3 py-1.5 rounded-lg"
+                              style={{ color: 'var(--color-text-secondary)' }}>취소</button>
+                            <Button size="sm" onClick={() => handleAnswerInquiry(inq.inquiryId)} disabled={answerSaving}>
+                              {answerSaving ? '저장 중...' : '답변 등록'}
+                            </Button>
+                          </div>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => { setAnsweringId(inq.inquiryId); setAnswerContent('') }}
+                          className="self-start text-xs px-3 py-1.5 rounded-lg border transition-colors"
+                          style={{ borderColor: 'var(--color-primary)', color: 'var(--color-primary)' }}
+                        >답변하기</button>
+                      )
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
+          ) : shopTab === 'orders' ? (
+            // 주문 관리 탭
+            <div className="flex flex-col gap-3">
+              {ordersLoading ? (
+                <div className="flex justify-center py-10">
+                  <div className="w-6 h-6 rounded-full border-2 border-t-transparent animate-spin"
+                    style={{ borderColor: 'var(--color-primary)', borderTopColor: 'transparent' }} />
+                </div>
+              ) : sellerOrders.length === 0 ? (
+                <div className="flex flex-col items-center gap-2 py-10">
+                  <Package size={36} style={{ color: 'var(--color-text-disabled)' }} />
+                  <p className="text-sm" style={{ color: 'var(--color-text-disabled)' }}>주문 내역이 없습니다</p>
+                </div>
+              ) : (
+                sellerOrders.map((order) => (
+                  <div key={order.orderId} className="border rounded-[8px] p-4 flex flex-col gap-2"
+                    style={{ borderColor: 'var(--color-border)' }}>
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>
+                        주문번호 {order.orderId} · {new Date(order.createdAt).toLocaleDateString('ko-KR')}
+                      </span>
+                      <span className="text-xs font-semibold px-2 py-0.5 rounded-full"
+                        style={{
+                          background: order.orderStatus === 'CANCELLED' ? 'rgba(244,67,54,0.08)' : 'rgba(76,175,80,0.08)',
+                          color: order.orderStatus === 'CANCELLED' ? 'var(--color-error)' : 'var(--color-success)',
+                        }}>
+                        {ORDER_STATUS_LABEL[order.orderStatus] ?? order.orderStatus}
+                      </span>
+                    </div>
+                    <p className="text-sm font-semibold">{order.totalPrice.toLocaleString()}원</p>
+                    {(order.orderStatus === 'WAITING' || order.orderStatus === 'PAID') && (
+                      <div className="flex gap-2 flex-wrap mt-1">
+                        {['SHIPPED', 'DELIVERED'].map((s) => (
+                          <button key={s}
+                            onClick={() => handleUpdateOrderStatus(order.orderId, s)}
+                            disabled={updatingOrderId === order.orderId}
+                            className="text-xs px-3 py-1.5 rounded-lg border transition-colors disabled:opacity-40"
+                            style={{ borderColor: 'var(--color-primary)', color: 'var(--color-primary)' }}
+                          >
+                            {s === 'SHIPPED' ? '배송중으로 변경' : '배송완료로 변경'}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    {order.orderStatus === 'SHIPPED' && (
+                      <button
+                        onClick={() => handleUpdateOrderStatus(order.orderId, 'DELIVERED')}
+                        disabled={updatingOrderId === order.orderId}
+                        className="self-start text-xs px-3 py-1.5 rounded-lg border transition-colors disabled:opacity-40"
+                        style={{ borderColor: 'var(--color-primary)', color: 'var(--color-primary)' }}
+                      >배송완료로 변경</button>
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
           ) : (
             // 상품 관리 탭
             <div className="flex flex-col gap-4">
@@ -1455,13 +1756,14 @@ export default function MyPage() {
 
   const renderContent = () => {
     switch (activeMenu) {
-      case 'orders':   return <OrdersSection />
-      case 'wishlist': return <WishlistSection />
-      case 'reviews':  return <ReviewsSection />
-      case 'inquiry':  return <InquirySection />
-      case 'coupons':  return <CouponsSection />
-      case 'shop':     return <ShopSection />
-      case 'settings': return <SettingsSection />
+      case 'orders':        return <OrdersSection />
+      case 'wishlist':      return <WishlistSection />
+      case 'liked_sellers': return <LikedSellersSection />
+      case 'reviews':       return <ReviewsSection />
+      case 'inquiry':       return <InquirySection />
+      case 'coupons':       return <CouponsSection />
+      case 'shop':          return <ShopSection />
+      case 'settings':      return <SettingsSection />
       default:         return null
     }
   }
