@@ -12,6 +12,9 @@ export interface InquirySummary {
   content: string
   createdAt: string
   status: 'PENDING' | 'ANSWERED'
+  answerContent?: string
+  productId?: number
+  sellerId?: number
 }
 
 export interface CreateInquiryBody {
@@ -27,4 +30,7 @@ export const inquiriesApi = {
 
   getMyInquiries: () =>
     api.get<ApiResponse<InquirySummary[]>>('/inquiries/me'),
+
+  answer: (id: number, content: string) =>
+    api.post<ApiResponse<InquirySummary>>(`/inquiries/${id}/answer`, { content }),
 }

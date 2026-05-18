@@ -40,6 +40,9 @@ export const paymentsApi = {
   fail: (orderId: number, code: string, message: string) =>
     api.post<ApiResponse<{ orderId: number; paymentStatus: string }>>('/payments/fail', { orderId, code, message }),
 
+  getOne: (paymentKey: string) =>
+    api.get<ApiResponse<TossPaymentResponse>>(`/payments/${paymentKey}`),
+
   getByOrder: (orderId: number) =>
     api.get<ApiResponse<TossPaymentResponse>>(`/payments/orders/${orderId}`),
 }

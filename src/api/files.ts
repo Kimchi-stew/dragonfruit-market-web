@@ -1,8 +1,24 @@
+import { api } from './client'
+
 const BASE_URL = '/api'
 
 function getAuthHeaders(): Record<string, string> {
   const token = localStorage.getItem('accessToken')
   return token ? { Authorization: `Bearer ${token}` } : {}
+}
+
+interface ApiResponse<T> {
+  success: boolean
+  data: T
+  message: string
+}
+
+export interface MediaFile {
+  mediaId: number
+  url: string
+  entityType: string
+  entityId: number
+  createdAt: string
 }
 
 export const filesApi = {
@@ -18,4 +34,10 @@ export const filesApi = {
     if (!json.success) throw new Error(json.message ?? '업로드 실패')
     return json.data.url as string
   },
+
+  getFiles: (entityType: string, entityId: number) =>
+    api.get<ApiResponse<MediaFile[]>>(`/files?entityType=${entityType}&entityId=${entityId}`),
+
+  deleteFile: (mediaId: number) =>
+    api.delete<ApiResponse<unknown>>(`/files/${mediaId}`),
 }

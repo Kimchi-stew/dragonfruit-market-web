@@ -78,4 +78,7 @@ export const ordersApi = {
 
   cancel: (id: number) =>
     api.delete<ApiResponse<unknown>>(`/orders/${id}`),
+
+  updateStatus: (id: number, orderStatus: string) =>
+    api.patch<ApiResponse<OrderSummary>>(`/orders/${id}/status`, { orderStatus }),
 }
